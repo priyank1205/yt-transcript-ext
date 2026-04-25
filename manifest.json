@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Transcript Extractor",
+  "version": "1.0",
+  "description": "Extracts timestamped transcripts from YouTube videos.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/watch?v=*"],
+      "js": ["scripts/content.js"]
+    }
+  ]
+}
