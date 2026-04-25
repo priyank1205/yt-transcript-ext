@@ -73,15 +73,27 @@ function injectSidebar(secondary) {
     const settingsPanel = document.createElement('div');
     settingsPanel.className = 'yt-timestamp-settings-panel';
     settingsPanel.style.cssText = 'padding:14px;background:#1a1a1a;border-bottom:1px solid #333;display:none;';
-    settingsPanel.innerHTML = `
-        <div style="margin-bottom:8px;font-size:12px;color:#888">Gemini API Key</div>
-        <input type="password" id="api-key-input" placeholder="Enter API Key" style="width:100%;box-sizing:border-box;background:#000;color:#fff;border:1px solid #444;padding:8px;border-radius:6px;margin-bottom:8px;">
-        <button id="save-key-btn" style="width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Save API Key</button>
-    `;
+    
+    const label = document.createElement('div');
+    label.style.cssText = 'margin-bottom:8px;font-size:12px;color:#888';
+    label.textContent = 'Gemini API Key';
+    settingsPanel.appendChild(label);
+    
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.id = 'api-key-input';
+    input.placeholder = 'Enter API Key';
+    input.style.cssText = 'width:100%;box-sizing:border-box;background:#000;color:#fff;border:1px solid #444;padding:8px;border-radius:6px;margin-bottom:8px;display:block';
+    settingsPanel.appendChild(input);
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.id = 'save-key-btn';
+    saveBtn.textContent = 'Save API Key';
+    saveBtn.style.cssText = 'width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;display:block';
+    settingsPanel.appendChild(saveBtn);
+    
     panel.appendChild(settingsPanel);
     
-    const saveBtn = settingsPanel.querySelector('#save-key-btn');
-    const input = settingsPanel.querySelector('#api-key-input');
     saveBtn.onclick = () => {
         chrome.storage.local.set({ GEMINI_API_KEY: input.value }, () => {
             saveBtn.textContent = 'Saved!';
