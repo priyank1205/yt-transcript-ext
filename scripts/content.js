@@ -52,10 +52,10 @@ function injectSidebar(secondary) {
     secondary.insertBefore(container, secondary.firstChild);
 
     const panel = document.createElement('div');
-    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:10px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7)`;
+    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:16px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7);overflow:hidden`;
 
     const panelHeader = document.createElement('div');
-    panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center`;
+    panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:16px;border-top-right-radius:16px`;
     
     const headerTitle = document.createElement('h3');
     headerTitle.textContent = 'Gemini Summary';
@@ -80,14 +80,14 @@ function injectSidebar(secondary) {
     actionArea.style.padding = '14px';
     
     const genBtn = document.createElement('button');
-    genBtn.textContent = 'Generate timestamped summary';
-    genBtn.style.cssText = 'width:100%;padding:10px;background:#FF0000;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold';
+    genBtn.textContent = 'Generate summary';
+    genBtn.style.cssText = 'width:100%;padding:10px;background:#333;color:#fff;border:1px solid #555;border-radius:20px;cursor:pointer;font-weight:bold';
     genBtn.onclick = () => {
         genBtn.textContent = 'Analyzing...';
         chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS" }, (res) => {
             if(!res || !res.success) {
                 genBtn.textContent = 'Error: ' + (res?.error || 'Unknown');
-                setTimeout(() => genBtn.textContent = 'Generate timestamped summary', 3000);
+                setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
             }
         });
     };
@@ -112,10 +112,10 @@ async function renderTimestamps(summaryText) {
     container.innerHTML = ''; 
 
     const panel = document.createElement('div');
-    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:10px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7)`;
+    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:16px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7);overflow:hidden`;
 
     const panelHeader = document.createElement('div');
-    panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center`;
+    panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:16px;border-top-right-radius:16px`;
     panelHeader.innerHTML = '<h3 style="margin:0;font-size:15px;font-weight:700;color:#fff">Summary</h3>';
     panel.appendChild(panelHeader);
     
@@ -156,11 +156,11 @@ async function renderTimestamps(summaryText) {
 
             const timeLabel = document.createElement('span');
             timeLabel.style.cssText = `flex:1;z-index:1;position:relative`;
-            timeLabel.innerHTML = \`<span style="color:#FF0000;margin-right:8px;font-weight:600">[\${time}]</span><span style="color:#e2e8f0">\${title}</span>\`;
+            timeLabel.innerHTML = `<span style="color:#FF0000;margin-right:8px;font-weight:600">[${time}]</span><span style="color:#e2e8f0">${title}</span>`;
             
             const expandBtn = document.createElement('span');
             expandBtn.textContent = '▼';
-            expandBtn.style.cssText = \`color:#FF0000;font-size:10px;opacity:0.7;transform:rotate(-90deg);transition:all 0.3s;cursor:pointer;z-index:2;padding:12px;margin:-12px;display:flex;align-items:center;justify-content:center;min-width:34px;min-height:34px\`;
+            expandBtn.style.cssText = `color:#FF0000;font-size:10px;opacity:0.7;transform:rotate(-90deg);transition:all 0.3s;cursor:pointer;z-index:2;padding:12px;margin:-12px;display:flex;align-items:center;justify-content:center;min-width:34px;min-height:34px`;
 
             tsDiv.appendChild(timeLabel);
             tsDiv.appendChild(expandBtn);
@@ -225,7 +225,7 @@ function extractFromSegments(segments) {
     segments.forEach(segment => {
       const timestamp = segment.querySelector('.segment-timestamp, #timestamp')?.textContent.trim();
       const text = segment.querySelector('.segment-text, #content')?.textContent.trim();
-      if (timestamp && text) output += \`[\${timestamp}] \${text}\\n\`;
+      if (timestamp && text) output += `[${timestamp}] ${text}\n`;
     });
     return { success: true, data: output };
 }
