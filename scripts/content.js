@@ -1,11 +1,3 @@
-const STYLE_CSS = `
-  @keyframes gradientFlash{0%{background:linear-gradient(90deg,transparent 0%,transparent 40%,transparent 100%);box-shadow:0 4px 16px rgba(255,0,0,0.1)}25%{background:linear-gradient(90deg,transparent 0%,rgba(255,0,0,0.4) 50%,transparent 100%);box-shadow:0 4px 20px rgba(255,0,0,0.5)}50%{background:linear-gradient(90deg,transparent 0%,rgba(255,0,0,0.6) 50%,transparent 100%);box-shadow:0 4px 24px rgba(255,0,0,0.7)}75%{background:linear-gradient(90deg,transparent 0%,rgba(255,0,0,0.3) 50%,transparent 100%);box-shadow:0 4px 20px rgba(255,0,0,0.4)}100%{background:#1a1a1a;box-shadow:none}}
-  .yt-section-header{font-size:12px;font-weight:700;color:#FFFFFF;opacity:0.5;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0;border-bottom:1px solid #333;margin-top:12px;margin-bottom:8px}
-  .yt-accordion-content{max-height:0;overflow:hidden;transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1);background:#262626;border:1px solid #333;border-top:none;border-radius:0 0 6px 6px;padding:0;font-size:14px;color:#c4bebe;line-height:1.6;margin-bottom:6px;opacity:0;transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1), padding 0.3s cubic-bezier(0.4,0,0.2,1)}
-  .yt-accordion-content.expanded{max-height:500px;opacity:1;padding:12px 14px}
-  .yt-gradient-flash{animation:gradientFlash 0.8s cubic-bezier(0.34,1.56,0.64,1)}
-  .yt-timestamp-settings-panel{position:absolute;top:40px;right:0;background:#1a1a1a;border:1px solid #333;padding:10px;border-radius:6px;z-index:999;display:none}
-`;
 
 // Global state
 let currentVideoId = null;
@@ -54,128 +46,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-function ensureStyles() {
-    if (!document.getElementById('yt-timestamp-styles')) {
-        const style = document.createElement('style');
-        style.id = 'yt-timestamp-styles';
-        style.textContent = STYLE_CSS;
-        document.head.appendChild(style);
-    }
-}
-
-function injectSidebar(secondary) {
-    ensureStyles();
-    
-    // Create scoped container
-    const container = document.createElement('div');
-    container.className = 'yt-timestamps-container';
-    container.style.cssText = `margin-bottom:16px;padding:0`;
-    secondary.insertBefore(container, secondary.firstChild);
-
-    // Using a simple wrapper for scope if needed, but flexbox stacking is already clean
-    const panel = document.createElement('div');
-    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:16px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7);display:flex;flex-direction:column`;
-
-    const panelHeader = document.createElement('div');
-    panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:16px;border-top-right-radius:16px`;
-    
-    const headerTitle = document.createElement('h3');
-    headerTitle.textContent = 'Gemini Summary';
-    headerTitle.style.cssText = `margin:0;font-size:15px;font-weight:700;color:#fff`;
-    
-    const gearIcon = document.createElement('span');
-    gearIcon.innerHTML = '⚙️';
-    gearIcon.style.cssText = 'cursor:pointer;font-size:16px';
-    gearIcon.onclick = toggleSettings;
-
-    panelHeader.appendChild(headerTitle);
-    panelHeader.appendChild(gearIcon);
-    panel.appendChild(panelHeader);
-
-    const settingsPanel = document.createElement('div');
-    settingsPanel.className = 'yt-timestamp-settings-panel';
-    settingsPanel.style.cssText = 'padding:14px;background:#1a1a1a;border-bottom:1px solid #333;display:none;position:static;';
-    
-    const label = document.createElement('div');
-    label.style.cssText = 'margin-bottom:8px;font-size:12px;color:#888';
-    label.textContent = 'Gemini API Key';
-    settingsPanel.appendChild(label);
-    
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = 'api-key-input';
-    input.placeholder = 'Enter API Key';
-    input.style.cssText = 'width:100%;box-sizing:border-box;background:#000;color:#fff;border:1px solid #444;padding:8px;border-radius:6px;margin-bottom:8px;display:block';
-    settingsPanel.appendChild(input);
-    
-    const saveBtn = document.createElement('button');
-    saveBtn.id = 'save-key-btn';
-    saveBtn.textContent = 'Save';
-    saveBtn.disabled = true;
-    saveBtn.style.cssText = 'width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;display:block;opacity:0.5;cursor:not-allowed';
-    settingsPanel.appendChild(saveBtn);
-    
-    panel.appendChild(settingsPanel);
-    
-    input.addEventListener('input', () => {
-        const hasValue = input.value.trim().length > 0;
-        saveBtn.disabled = !hasValue;
-        saveBtn.style.opacity = hasValue ? '1' : '0.5';
-        saveBtn.style.cursor = hasValue ? 'pointer' : 'not-allowed';
-    });
-    
-    saveBtn.onclick = () => {
-        chrome.storage.local.set({ GEMINI_API_KEY: input.value }, () => {
-            saveBtn.textContent = 'Saved!';
-            setTimeout(() => {
-                saveBtn.textContent = 'Save';
-                toggleSettings();
-            }, 1000);
-        });
-    };
-    
-    const actionArea = document.createElement('div');
-    actionArea.id = 'action-area';
-    actionArea.style.padding = '14px';
-    
-    const genBtn = document.createElement('button');
-    genBtn.textContent = 'Generate summary';
-    genBtn.style.cssText = 'width:100%;padding:10px;background:#333;color:#fff;border:1px solid #555;border-radius:20px;cursor:pointer;font-weight:bold';
-    genBtn.onclick = () => {
-        genBtn.textContent = 'Analyzing...';
-        chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS" }, (res) => {
-            if(!res || !res.success) {
-                genBtn.textContent = 'Error: ' + (res?.error || 'Unknown');
-                setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
-            }
-        });
-    };
-    actionArea.appendChild(genBtn);
-    panel.appendChild(actionArea);
-
-    container.appendChild(panel);
-}
-
-function ensureStyles() {
-    if (!document.getElementById('yt-timestamp-styles')) {
-        const style = document.createElement('style');
-        style.id = 'yt-timestamp-styles';
-        style.textContent = STYLE_CSS;
-        document.head.appendChild(style);
-    }
-}
-
-function initSidebar() {
-    ensureStyles();
-    const observer = new MutationObserver((mutations, obs) => {
-        const secondary = document.querySelector('ytd-watch-flexy #secondary');
-        if (secondary) {
-            injectSidebar(secondary);
-            obs.disconnect();
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-}
 
 function injectSidebar(secondary) {
     if (document.querySelector('.yt-timestamps-container')) return;
@@ -358,8 +228,13 @@ async function renderTimestamps(summaryText) {
             expandBtn.onclick = e => {
                 e.stopPropagation();
                 isExpanded = !isExpanded;
-                accordionContent.classList.toggle('expanded', isExpanded);
-                expandBtn.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)';
+                if (isExpanded) {
+                    accordionContent.classList.add('expanded');
+                    expandBtn.style.transform = 'rotate(0deg)';
+                } else {
+                    accordionContent.classList.remove('expanded');
+                    expandBtn.style.transform = 'rotate(-90deg)';
+                }
             };
 
             tsDiv.onmouseover = () => { tsDiv.style.background = '#262626'; glowBorder.style.opacity = '1'; };
