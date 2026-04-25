@@ -125,10 +125,18 @@ function injectSidebar(secondary) {
 
 function toggleSettings() {
     const panel = document.querySelector('.yt-timestamp-settings-panel');
+    if (!panel) return;
+    
     panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
     
-    const input = document.getElementById('api-key-input');
-    chrome.storage.local.get(['GEMINI_API_KEY'], (res) => { if(input) input.value = res.GEMINI_API_KEY || '' });
+    if (panel.style.display === 'block') {
+        const input = panel.querySelector('#api-key-input');
+        if (input) {
+            chrome.storage.local.get(['GEMINI_API_KEY'], (res) => { 
+                input.value = res.GEMINI_API_KEY || ''; 
+            });
+        }
+    }
 }
 
 async function renderTimestamps(summaryText) {
