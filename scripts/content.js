@@ -80,7 +80,7 @@ function injectSidebar(secondary) {
     settingsPanel.appendChild(label);
     
     const input = document.createElement('input');
-    input.type = 'password';
+    input.type = 'text';
     input.id = 'api-key-input';
     input.placeholder = 'Enter API Key';
     input.style.cssText = 'width:100%;box-sizing:border-box;background:#000;color:#fff;border:1px solid #444;padding:8px;border-radius:6px;margin-bottom:8px;display:block';
