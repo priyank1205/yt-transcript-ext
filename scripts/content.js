@@ -61,15 +61,17 @@ async function renderTimestamps(summaryText) {
     const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
 
     lines.forEach(line => {
-        if (line.startsWith('#')) {
+        // Updated regex to handle the fenced code block output and match [mm:ss] or [h:mm:ss]
+        const cleanLine = line.replace(/```/g, '').trim();
+        if (cleanLine.startsWith('#')) {
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'yt-section-header';
-            sectionHeader.textContent = line.substring(1).trim();
+            sectionHeader.textContent = cleanLine.substring(1).trim();
             timestampsList.appendChild(sectionHeader);
             return;
         }
 
-        const timeMatch = line.match(/^\[(\d+:\d{2}:\d{2}|\d+:\d{2})\]\s*-\s*(.+?):\s*(.+)$/);
+        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
         if (timeMatch) {
             const time = timeMatch[1];
             const title = timeMatch[2];
