@@ -10,11 +10,25 @@ async function handleGeminiAnalysis(sendResponse) {
     // 1. Get the active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    // 2. Fetch transcript from content script
-    const transcriptResponse = await chrome.tabs.sendMessage(tab.id, { action: "GET_TRANSCRIPT" });
+    // 2. Fetch transcript from content script with retry
+    let transcriptResponse;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        transcriptResponse = await chrome.tabs.sendMessage(tab.id, { action: "GET_TRANSCRIPT" });
+        break;
+      } catch (err) {
+        if (err.message.includes("Receiving end does not exist") && retries > 1) {
+          await new Promise(r => setTimeout(r, 1000));
+          retries--;
+        } else {
+          throw err;
+        }
+      }
+    }
     
-    if (!transcriptResponse.success) {
-      sendResponse({ success: false, error: transcriptResponse.error });
+    if (!transcriptResponse || !transcriptResponse.success) {
+      sendResponse({ success: false, error: transcriptResponse ? transcriptResponse.error : "Could not connect to page." });
       return;
     }
 
