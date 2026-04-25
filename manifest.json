@@ -1,15 +1,20 @@
 {
   "manifest_version": 3,
   "name": "YouTube Transcript Extractor",
-  "version": "1.0",
-  "description": "Extracts timestamped transcripts from YouTube videos.",
+  "version": "1.1",
+  "description": "Extracts and summarizes transcripts from YouTube videos using Gemini.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
-    "*://*.youtube.com/*"
+    "*://*.youtube.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup/popup.html"
   },

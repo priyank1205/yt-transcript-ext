@@ -4,7 +4,7 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
   const resultArea = document.getElementById('resultArea');
   const copyBtn = document.getElementById('copyBtn');
 
-  status.textContent = 'Initializing...';
+  status.textContent = 'Opening transcript...';
   resultArea.value = '';
   copyBtn.disabled = true;
 
@@ -22,18 +22,15 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
   };
 
   try {
-    status.textContent = 'Opening transcript...';
     let response;
     try {
       response = await sendMessage(tab.id);
     } catch (err) {
-      // Script might not be injected, try injecting it
       status.textContent = 'Connecting to page...';
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['scripts/content.js']
       });
-      // Try again after a short delay
       await new Promise(r => setTimeout(r, 500));
       response = await sendMessage(tab.id);
     }
@@ -49,6 +46,22 @@ document.getElementById('fetchBtn').addEventListener('click', async () => {
     status.textContent = 'Error: ' + err.message;
     console.error(err);
   }
+});
+
+document.getElementById('geminiBtn').addEventListener('click', async () => {
+  const status = document.getElementById('status');
+  const resultArea = document.getElementById('resultArea');
+  
+  status.textContent = 'Thinking...';
+  
+  chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS" }, (response) => {
+    if (response && response.success) {
+      resultArea.value = response.data;
+      status.textContent = 'Analysis Complete!';
+    } else {
+      status.textContent = 'Error: ' + (response ? response.error : 'Check API Key in storage');
+    }
+  });
 });
 
 document.getElementById('copyBtn').addEventListener('click', () => {
