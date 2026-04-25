@@ -72,7 +72,7 @@ function injectSidebar(secondary) {
 
     const settingsPanel = document.createElement('div');
     settingsPanel.className = 'yt-timestamp-settings-panel';
-    settingsPanel.style.cssText = 'padding:14px;background:#1a1a1a;border-bottom:1px solid #333;display:none;';
+    settingsPanel.style.cssText = 'padding:14px;background:#1a1a1a;border-bottom:1px solid #333;display:none;position:static;';
     
     const label = document.createElement('div');
     label.style.cssText = 'margin-bottom:8px;font-size:12px;color:#888';
