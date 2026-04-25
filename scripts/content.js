@@ -157,11 +157,20 @@ async function extractTranscript() {
       return { success: false, error: "Transcript panel container not found." };
     }
     
+    const originalVisibility = panel.getAttribute('visibility');
     panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED');
     await sleep(1000);
 
     // 4. Extract segments
     const segments = Array.from(document.querySelectorAll('ytd-transcript-segment-renderer'));
+    
+    // Clean up visibility before returning
+    if (originalVisibility) {
+        panel.setAttribute('visibility', originalVisibility);
+    } else {
+        panel.removeAttribute('visibility');
+    }
+
     if (segments.length === 0) {
       return { success: false, error: "Panel opened but no segments found." };
     }
