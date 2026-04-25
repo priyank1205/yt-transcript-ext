@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Transcript Extractor",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Extracts and summarizes transcripts from YouTube videos using Gemini.",
   "permissions": [
     "activeTab",
@@ -14,9 +14,6 @@
   ],
   "background": {
     "service_worker": "background.js"
-  },
-  "action": {
-    "default_popup": "popup/popup.html"
   },
   "content_scripts": [
     {
