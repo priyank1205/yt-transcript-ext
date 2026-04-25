@@ -88,16 +88,29 @@ function injectSidebar(secondary) {
     
     const saveBtn = document.createElement('button');
     saveBtn.id = 'save-key-btn';
-    saveBtn.textContent = 'Save API Key';
-    saveBtn.style.cssText = 'width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;display:block';
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = true;
+    saveBtn.style.cssText = 'width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;display:block;opacity:1';
+    saveBtn.style.opacity = '0.5'; // Visual disabled state
+    saveBtn.style.cursor = 'not-allowed';
     settingsPanel.appendChild(saveBtn);
     
     panel.appendChild(settingsPanel);
     
+    input.addEventListener('input', () => {
+        const hasValue = input.value.trim().length > 0;
+        saveBtn.disabled = !hasValue;
+        saveBtn.style.opacity = hasValue ? '1' : '0.5';
+        saveBtn.style.cursor = hasValue ? 'pointer' : 'not-allowed';
+    });
+    
     saveBtn.onclick = () => {
         chrome.storage.local.set({ GEMINI_API_KEY: input.value }, () => {
             saveBtn.textContent = 'Saved!';
-            setTimeout(() => saveBtn.textContent = 'Save API Key', 2000);
+            setTimeout(() => {
+                saveBtn.textContent = 'Save';
+                toggleSettings(); // Close panel after saving
+            }, 1000);
         });
     };
     
@@ -131,9 +144,14 @@ function toggleSettings() {
     
     if (panel.style.display === 'block') {
         const input = panel.querySelector('#api-key-input');
-        if (input) {
+        const saveBtn = panel.querySelector('#save-key-btn');
+        if (input && saveBtn) {
             chrome.storage.local.get(['GEMINI_API_KEY'], (res) => { 
                 input.value = res.GEMINI_API_KEY || ''; 
+                const hasValue = input.value.trim().length > 0;
+                saveBtn.disabled = !hasValue;
+                saveBtn.style.opacity = hasValue ? '1' : '0.5';
+                saveBtn.style.cursor = hasValue ? 'pointer' : 'not-allowed';
             });
         }
     }
