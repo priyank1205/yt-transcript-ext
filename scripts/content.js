@@ -76,7 +76,7 @@ function injectSidebar(secondary) {
     settingsPanel.innerHTML = `
         <div style="margin-bottom:8px;font-size:12px;color:#888">Gemini API Key</div>
         <input type="password" id="api-key-input" placeholder="Enter API Key" style="width:100%;box-sizing:border-box;background:#000;color:#fff;border:1px solid #444;padding:8px;border-radius:6px;margin-bottom:8px;">
-        <button id="save-key-btn" style="width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Save Key</button>
+        <button id="save-key-btn" style="width:100%;padding:8px;background:#FF0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Save API Key</button>
     `;
     panel.appendChild(settingsPanel);
     
@@ -85,7 +85,7 @@ function injectSidebar(secondary) {
     saveBtn.onclick = () => {
         chrome.storage.local.set({ GEMINI_API_KEY: input.value }, () => {
             saveBtn.textContent = 'Saved!';
-            setTimeout(() => saveBtn.textContent = 'Save Key', 2000);
+            setTimeout(() => saveBtn.textContent = 'Save API Key', 2000);
         });
     };
     
