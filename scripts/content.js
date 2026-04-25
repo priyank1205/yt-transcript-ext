@@ -8,7 +8,7 @@ const STYLE_CSS = `
 `;
 
 // Initialize
-window.addEventListener('yt-navigate-finish', initSidebar);
+window.addEventListener('yt-navigate-finish', () => initSidebar());
 initSidebar();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
