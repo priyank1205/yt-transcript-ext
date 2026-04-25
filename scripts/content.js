@@ -155,7 +155,6 @@ function injectSidebar(secondary) {
 
     container.appendChild(panel);
 }
-});
 
 function ensureStyles() {
     if (!document.getElementById('yt-timestamp-styles')) {
