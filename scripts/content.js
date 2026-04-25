@@ -163,7 +163,7 @@ async function renderTimestamps(summaryText) {
     container.innerHTML = ''; 
 
     const panel = document.createElement('div');
-    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:16px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7);overflow:hidden`;
+    panel.style.cssText = `position:relative;background:#0d0d0d;border:1px solid #333;border-radius:16px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,0.7);display:flex;flex-direction:column`;
 
     const panelHeader = document.createElement('div');
     panelHeader.style.cssText = `background:linear-gradient(135deg,#000 0%,#1a1a1a 100%);padding:14px 16px;border-bottom:2px solid #FF0000;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:16px;border-top-right-radius:16px`;
