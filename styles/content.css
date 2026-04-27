@@ -1,0 +1,248 @@
+/* styles/content.css */
+
+@keyframes gradientFlash {
+  0% {
+    background: linear-gradient(90deg, transparent 0%, transparent 40%, transparent 100%);
+    box-shadow: 0 4px 16px rgba(255, 0, 0, 0.1);
+  }
+  25% {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 0, 0, 0.4) 50%, transparent 100%);
+    box-shadow: 0 4px 20px rgba(255, 0, 0, 0.5);
+  }
+  50% {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 0, 0, 0.6) 50%, transparent 100%);
+    box-shadow: 0 4px 24px rgba(255, 0, 0, 0.7);
+  }
+  75% {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 0, 0, 0.3) 50%, transparent 100%);
+    box-shadow: 0 4px 20px rgba(255, 0, 0, 0.4);
+  }
+  100% {
+    background: #1a1a1a;
+    box-shadow: none;
+  }
+}
+
+.yt-section-header {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  opacity: 0.5 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid #333 !important;
+  margin-top: 12px !important;
+  margin-bottom: 8px !important;
+}
+
+.yt-accordion-content {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: #262626 !important;
+  border: 1px solid #333 !important;
+  border-top: none !important;
+  border-radius: 0 0 6px 6px !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  color: #c4bebe !important;
+  line-height: 1.6 !important;
+  margin-bottom: 6px !important;
+  opacity: 0 !important;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.yt-accordion-content.expanded {
+  max-height: 500px !important;
+  opacity: 1 !important;
+  padding: 12px 14px !important;
+}
+
+.yt-gradient-flash {
+  animation: gradientFlash 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Container Styles */
+.yt-timestamps-container {
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+/* Panel Styles */
+.yt-timestamps-panel {
+  position: relative;
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Panel Header Styles */
+.yt-timestamps-panel-header {
+  background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+  padding: 14px 16px;
+  border-bottom: 2px solid #FF0000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+.yt-timestamps-panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.yt-timestamps-panel-header .gear-icon {
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* Settings Panel Styles */
+.yt-timestamp-settings-panel {
+  padding: 14px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  display: none;
+  position: static;
+}
+
+.yt-timestamp-settings-panel label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #888;
+}
+
+.yt-timestamp-settings-panel input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #000;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.yt-timestamp-settings-panel button {
+  width: 100%;
+  padding: 8px;
+  background: #FF0000;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  display: block;
+  opacity: 1;
+}
+
+.yt-timestamp-settings-panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action Area Styles */
+#action-area {
+  padding: 14px;
+}
+
+#action-area button {
+  width: 100%;
+  padding: 10px;
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Timestamp Item Styles */
+.yt-timestamp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  margin: 4px 0;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.yt-timestamp-item:hover {
+  background: #262626;
+  border-color: #FF0000;
+}
+
+.yt-time-label {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.yt-time {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #FF0000 !important;
+  margin-right: 8px;
+}
+
+.yt-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #fff !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.yt-expand-btn {
+  font-size: 16px !important;
+  color: #888 !important;
+  transition: transform 0.3s ease !important;
+  margin-left: 8px;
+  padding: 8px 12px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yt-timestamps-list {
+  padding: 0 14px 14px;
+}
+
+/* Glow effect for timestamp items */
+.yt-glow-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(255, 0, 0, 0);
+  transition: box-shadow 0.3s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.yt-timestamp-item:hover .yt-glow-border {
+  box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
+}
