@@ -63,7 +63,23 @@ function injectSidebar(secondary) {
     // Create header title element
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
-    headerTitle.textContent = 'Gemini Summary';
+    headerTitle.textContent = 'Summary';
+    
+    // Create model selection dropdown
+    const headerModelSelect = document.createElement('select');
+    headerModelSelect.id = 'header-model-select';
+    headerModelSelect.className = 'yt-timestamps-model-select';
+    
+    const headerGeminiOption = document.createElement('option');
+    headerGeminiOption.value = 'gemini';
+    headerGeminiOption.textContent = 'Gemini';
+    
+    const headerMistralOption = document.createElement('option');
+    headerMistralOption.value = 'mistral';
+    headerMistralOption.textContent = 'Mistral';
+    
+    headerModelSelect.appendChild(headerGeminiOption);
+    headerModelSelect.appendChild(headerMistralOption);
     
     // Create gear icon element
     const gearIcon = document.createElement('span');
@@ -73,6 +89,7 @@ function injectSidebar(secondary) {
     
     // Append elements to panel header
     panelHeader.appendChild(headerTitle);
+    panelHeader.appendChild(headerModelSelect);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
     
@@ -138,6 +155,18 @@ function injectSidebar(secondary) {
     mistralKeyInput.className = 'yt-timestamp-settings-input';
     mistralKeyInput.style.display = 'none';
     
+// Add event listener to header model selection
+    headerModelSelect.addEventListener('change', (e) => {
+        const selectedModel = e.target.value;
+        // Update header title based on selected model
+        headerTitle.textContent = `${selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1)} Summary`;
+        // Sync with settings panel model select
+        const settingsModelSelect = document.getElementById('model-select');
+        if (settingsModelSelect) {
+            settingsModelSelect.value = selectedModel;
+        }
+    });
+    
     // Add event listener to model selection
     modelSelect.addEventListener('change', (e) => {
         const selectedModel = e.target.value;
@@ -155,8 +184,53 @@ function injectSidebar(secondary) {
             mistralKeyInput.style.display = 'block';
         }
         
-        // Update the current model
-        updateCurrentModel(selectedModel);
+        // Sync with header model select
+        const headerModelSelect = document.getElementById('header-model-select');
+        if (headerModelSelect) {
+            headerModelSelect.value = selectedModel;
+        }
+    });
+    
+    // Set default selection based on saved API keys
+    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
+        // Default to Gemini if no model is selected
+        let defaultModel = 'gemini';
+        
+        // Check if we have saved API keys
+        const hasGeminiKey = !!result.GEMINI_API_KEY;
+        const hasMistralKey = !!result.MISTRAL_API_KEY;
+        
+        // Default selection logic:
+        // 1. If only one model has a saved API key, select that model
+        // 2. If both models have saved API keys, select Gemini by default
+        // 3. If neither has a saved API key, default to Gemini
+        if (hasGeminiKey && !hasMistralKey) {
+            defaultModel = 'gemini';
+        } else if (!hasGeminiKey && hasMistralKey) {
+            defaultModel = 'mistral';
+        } else if (hasGeminiKey && hasMistralKey) {
+            defaultModel = 'gemini'; // Both have keys, default to Gemini
+        } else if (!hasGeminiKey && !hasMistralKey) {
+            defaultModel = 'gemini'; // Neither has keys, default to Gemini
+        }
+        
+        // Set the default model in both dropdowns
+        headerModelSelect.value = defaultModel;
+        headerTitle.textContent = `${defaultModel.charAt(0).toUpperCase() + defaultModel.slice(1)} Summary`;
+        
+        // Also update the settings model select
+        const settingsModelSelect = document.getElementById('model-select');
+        if (settingsModelSelect) {
+            settingsModelSelect.value = defaultModel;
+        }
+        
+        // Add tooltip functionality for missing API keys
+        if (!hasGeminiKey) {
+            headerGeminiOption.title = "API key required";
+        }
+        if (!hasMistralKey) {
+            headerMistralOption.title = "API key required";
+        }
     });
     
     // Create save button
@@ -226,7 +300,8 @@ function injectSidebar(secondary) {
         console.log('Generate button clicked');
         genBtn.textContent = 'Analyzing...';
         try {
-            const selectedModel = modelSelect.value;
+            const headerModelSelect = document.getElementById('header-model-select');
+            const selectedModel = headerModelSelect ? headerModelSelect.value : 'gemini';
             console.log(`Prompt sent to ${selectedModel}`);
             chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: selectedModel }, (res) => {
                 if (chrome.runtime.lastError) {
@@ -259,4 +334,12 @@ function injectSidebar(secondary) {
     
     // Insert container into secondary
     secondary.insertBefore(container, secondary.firstChild);
+}
+
+// Export functions for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    observeDOM,
+    injectSidebar
+  };
 }
