@@ -107,19 +107,7 @@ async function renderTimestamps(summaryText) {
 
             const timeLabel = document.createElement('span');
             timeLabel.className = 'yt-time-label';
-            
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'yt-time';
-            timeSpan.textContent = `[${time}]`;
-            
-            const titleSpan = document.createElement('span');
-            titleSpan.className = 'yt-title';
-            titleSpan.textContent = title;
-            
-            timeLabel.appendChild(timeSpan);
-            timeLabel.appendChild(titleSpan);
-            timeLabel.appendChild(titleSpan);
-            timeLabel.appendChild(titleSpan);
+            timeLabel.innerHTML = `<span class="yt-time">[${time}]</span> <span class="yt-title">${title}</span>`;
             
             const expandBtn = document.createElement('span');
             expandBtn.textContent = '▼';
@@ -145,6 +133,8 @@ async function renderTimestamps(summaryText) {
                 }
             };
 
+            tsDiv.onmouseover = () => { tsDiv.style.background = '#262626'; glowBorder.style.opacity = '1'; };
+            tsDiv.onmouseout = () => { tsDiv.style.background = '#1a1a1a'; glowBorder.style.opacity = '0'; };
             tsDiv.onclick = () => {
                 const video = document.querySelector('video');
                 if (video) video.currentTime = sec;
@@ -164,4 +154,15 @@ async function renderTimestamps(summaryText) {
 // Helper function for sleep
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Export functions for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    extractTranscript,
+    findTranscriptButton,
+    extractFromSegments,
+    renderTimestamps,
+    sleep
+  };
 }

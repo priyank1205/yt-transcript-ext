@@ -80,6 +80,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  max-height: 600px;
   overflow-y: auto;
 }
 
@@ -107,7 +108,7 @@
   font-size: 16px;
 }
 
-/* Settings Panel Styles */
+/* Timestamp Settings Panel Styles */
 .yt-timestamp-settings-panel {
   padding: 14px;
   background: #1a1a1a;
@@ -120,6 +121,18 @@
   margin-bottom: 8px;
   font-size: 12px;
   color: #888;
+}
+
+.yt-timestamp-settings-panel select {
+  width: 100%;
+  box-sizing: border-box;
+  background: #000;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: block;
 }
 
 .yt-timestamp-settings-panel input {
@@ -214,7 +227,7 @@
 }
 
 .yt-expand-btn {
-  font-size: 16px !important;
+  font-size: 12px !important;
   color: #888 !important;
   transition: transform 0.3s ease !important;
   margin-left: 8px;

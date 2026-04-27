@@ -55,39 +55,94 @@ function injectSidebar(secondary) {
     const settingsPanel = document.createElement('div');
     settingsPanel.className = 'yt-timestamp-settings-panel';
     
-    // Create settings panel content
-    const label = document.createElement('div');
-    label.className = 'yt-timestamp-settings-label';
-    label.textContent = 'Gemini API Key';
+    // Create model selection dropdown
+    const modelLabel = document.createElement('div');
+    modelLabel.className = 'yt-timestamp-settings-label';
+    modelLabel.textContent = 'Model';
     
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = 'api-key-input';
-    input.placeholder = 'Enter API Key';
-    input.className = 'yt-timestamp-settings-input';
+    const modelSelect = document.createElement('select');
+    modelSelect.id = 'model-select';
+    modelSelect.className = 'yt-timestamp-settings-input';
     
+    const geminiOption = document.createElement('option');
+    geminiOption.value = 'gemini';
+    geminiOption.textContent = 'Gemini';
+    
+    const mistralOption = document.createElement('option');
+    mistralOption.value = 'mistral';
+    mistralOption.textContent = 'Mistral';
+    
+    modelSelect.appendChild(geminiOption);
+    modelSelect.appendChild(mistralOption);
+    
+    // Create API key fields
+    const geminiKeyLabel = document.createElement('div');
+    geminiKeyLabel.className = 'yt-timestamp-settings-label';
+    geminiKeyLabel.textContent = 'Gemini API Key';
+    
+    const geminiKeyInput = document.createElement('input');
+    geminiKeyInput.type = 'text';
+    geminiKeyInput.id = 'gemini-api-key-input';
+    geminiKeyInput.placeholder = 'Enter Gemini API Key';
+    geminiKeyInput.className = 'yt-timestamp-settings-input';
+    
+    const mistralKeyLabel = document.createElement('div');
+    mistralKeyLabel.className = 'yt-timestamp-settings-label';
+    mistralKeyLabel.textContent = 'Mistral API Key';
+    mistralKeyLabel.style.display = 'none';
+    
+    const mistralKeyInput = document.createElement('input');
+    mistralKeyInput.type = 'text';
+    mistralKeyInput.id = 'mistral-api-key-input';
+    mistralKeyInput.placeholder = 'Enter Mistral API Key';
+    mistralKeyInput.className = 'yt-timestamp-settings-input';
+    mistralKeyInput.style.display = 'none';
+    
+    // Add event listener to model selection
+    modelSelect.addEventListener('change', (e) => {
+        const selectedModel = e.target.value;
+        
+        // Show/hide API key fields based on selection
+        if (selectedModel === 'gemini') {
+            geminiKeyLabel.style.display = 'block';
+            geminiKeyInput.style.display = 'block';
+            mistralKeyLabel.style.display = 'none';
+            mistralKeyInput.style.display = 'none';
+        } else {
+            geminiKeyLabel.style.display = 'none';
+            geminiKeyInput.style.display = 'none';
+            mistralKeyLabel.style.display = 'block';
+            mistralKeyInput.style.display = 'block';
+        }
+    });
+    
+    // Create save button
     const saveBtn = document.createElement('button');
     saveBtn.id = 'save-key-btn';
     saveBtn.textContent = 'Save';
     saveBtn.className = 'yt-timestamp-settings-button';
     saveBtn.disabled = true;
     
-    // Append elements to settings panel
-    settingsPanel.appendChild(label);
-    settingsPanel.appendChild(input);
-    settingsPanel.appendChild(saveBtn);
-    
-    // Add input event listener
-    input.addEventListener('input', () => {
-        const hasValue = input.value.trim().length > 0;
+    // Add input event listeners
+    geminiKeyInput.addEventListener('input', () => {
+        const hasValue = geminiKeyInput.value.trim().length > 0;
         saveBtn.disabled = !hasValue;
-        // Use CSS for disabled state instead of inline styles
     });
     
-// Add save button event listener
+    mistralKeyInput.addEventListener('input', () => {
+        const hasValue = mistralKeyInput.value.trim().length > 0;
+        saveBtn.disabled = !hasValue;
+    });
+    
+    // Add save button event listener
     saveBtn.onclick = () => {
         try {
-            chrome.storage.local.set({ GEMINI_API_KEY: input.value }, () => {
+            const selectedModel = modelSelect.value;
+            const storageKey = `${selectedModel.toUpperCase()}_API_KEY`;
+            const inputId = `${selectedModel}-api-key-input`;
+            const apiKey = document.getElementById(inputId).value;
+            
+            chrome.storage.local.set({ [storageKey]: apiKey }, () => {
                 if (chrome.runtime.lastError) {
                     console.error('Error saving API key:', chrome.runtime.lastError);
                     return;
@@ -103,6 +158,15 @@ function injectSidebar(secondary) {
         }
     };
     
+    // Append elements to settings panel
+    settingsPanel.appendChild(modelLabel);
+    settingsPanel.appendChild(modelSelect);
+    settingsPanel.appendChild(geminiKeyLabel);
+    settingsPanel.appendChild(geminiKeyInput);
+    settingsPanel.appendChild(mistralKeyLabel);
+    settingsPanel.appendChild(mistralKeyInput);
+    settingsPanel.appendChild(saveBtn);
+    
     // Append settings panel to panel
     panel.appendChild(settingsPanel);
     
@@ -116,9 +180,12 @@ function injectSidebar(secondary) {
     genBtn.textContent = 'Generate summary';
     genBtn.className = 'yt-timestamps-generate-button';
     genBtn.onclick = () => {
+        console.log('Generate button clicked');
         genBtn.textContent = 'Analyzing...';
         try {
-            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS" }, (res) => {
+            const selectedModel = modelSelect.value;
+            console.log(`Prompt sent to ${selectedModel}`);
+            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: selectedModel }, (res) => {
                 if (chrome.runtime.lastError) {
                     console.error('Extension context error:', chrome.runtime.lastError);
                     genBtn.textContent = 'Error: Context invalidated';
@@ -126,8 +193,11 @@ function injectSidebar(secondary) {
                     return;
                 }
                 if (!res || !res.success) {
+                    console.log(`Error occurred: ${res?.error || 'Unknown'}`);
                     genBtn.textContent = 'Error: ' + (res?.error || 'Unknown');
                     setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
+                } else {
+                    console.log(`Summary received from ${selectedModel}`);
                 }
             });
         } catch (e) {
@@ -146,4 +216,21 @@ function injectSidebar(secondary) {
     
     // Insert container into secondary
     secondary.insertBefore(container, secondary.firstChild);
+}
+
+// Function to toggle settings panel visibility
+function toggleSettings() {
+    const settingsPanel = document.querySelector('.yt-timestamp-settings-panel');
+    if (settingsPanel) {
+        const isVisible = settingsPanel.style.display === 'block';
+        settingsPanel.style.display = isVisible ? 'none' : 'block';
+    }
+}
+
+// Export functions for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    injectSidebar,
+    toggleSettings
+  };
 }

@@ -11,6 +11,16 @@ const CONSTANTS = {
     CONTENT: '.segment-text, #content'
   },
   API_ENDPOINTS: {
-    GEMINI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent'
+    GEMINI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent',
+    MISTRAL: 'https://api.mistral.ai/v1/chat/completions'
+  },
+  MODELS: {
+    GEMINI: 'gemini',
+    MISTRAL: 'mistral'
   }
 };
+
+// Export constants for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = CONSTANTS;
+}

@@ -2,11 +2,19 @@
 
 // Global state
 let currentVideoId = null;
+let currentModel = 'gemini';
 
 // Initialize
 function initApp() {
     window.addEventListener('yt-navigate-start', resetSidebar);
     window.addEventListener('yt-navigate-finish', handleNavigation);
+    
+    // Load the selected model from storage
+    chrome.storage.local.get(['SELECTED_MODEL'], (result) => {
+        if (result.SELECTED_MODEL) {
+            currentModel = result.SELECTED_MODEL;
+        }
+    });
     
     // Initial check
     handleNavigation();
@@ -35,6 +43,12 @@ function handleNavigation() {
         // Use MutationObserver for DOM changes
         observeDOM();
     }
+}
+
+// Function to update the current model
+function updateCurrentModel(model) {
+    currentModel = model;
+    chrome.storage.local.set({ SELECTED_MODEL: model });
 }
 
 initApp();
