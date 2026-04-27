@@ -1,0 +1,67 @@
+<!-- options/options.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>YouTube Transcript Extractor Options</title>
+  <style>
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #0d0d0d;
+      color: #fff;
+    }
+    
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: #FF0000;
+    }
+    
+    .option {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      background: #000;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #FF0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    button:hover {
+      background: #cc0000;
+    }
+  </style>
+</head>
+<body>
+  <h1>YouTube Transcript Extractor Settings</h1>
+  <div class="option">
+    <label for="api-key">Gemini API Key</label>
+    <input type="text" id="api-key" placeholder="Enter your API Key">
+    <button id="save-key">Save</button>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

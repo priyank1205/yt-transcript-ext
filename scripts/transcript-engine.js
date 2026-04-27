@@ -1,0 +1,167 @@
+// scripts/transcript-engine.js
+
+// Function to extract transcript from YouTube video
+async function extractTranscript() {
+  try {
+    let transcriptBtn = findTranscriptButton();
+    if (!transcriptBtn) {
+      const expandBtn = document.querySelector('tp-yt-paper-button.expand-button, #expand-button');
+      if (expandBtn) {
+        expandBtn.click();
+        await sleep(1000);
+        transcriptBtn = findTranscriptButton();
+      }
+    }
+    if (!transcriptBtn) return { success: false, error: "Transcript button not found." };
+    transcriptBtn.click();
+    await sleep(1000);
+    const panel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]');
+    if (!panel) return { success: false, error: "Transcript panel container not found." };
+    const originalVisibility = panel.getAttribute('visibility');
+    panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED');
+    await sleep(1000);
+    const segments = Array.from(document.querySelectorAll('ytd-transcript-segment-renderer'));
+    if (originalVisibility) panel.setAttribute('visibility', originalVisibility); else panel.removeAttribute('visibility');
+    if (segments.length === 0) return { success: false, error: "Panel opened but no segments found." };
+    return extractFromSegments(segments);
+  } catch (err) { return { success: false, error: "Extraction error: " + err.message }; }
+}
+
+// Function to find transcript button using a more robust method
+function findTranscriptButton() {
+  // Use a more specific selector to find the transcript button
+  const transcriptButton = document.querySelector('ytd-video-secondary-info-renderer ytd-button-renderer');
+  if (transcriptButton) {
+    return transcriptButton;
+  }
+  // Fallback to text-based search
+  const allButtons = Array.from(document.querySelectorAll('button, ytd-button-renderer'));
+  return allButtons.find(btn => btn.textContent.toLowerCase().includes('show transcript'));
+}
+
+// Function to extract from segments
+function extractFromSegments(segments) {
+    let output = "";
+    segments.forEach(segment => {
+      const timestamp = segment.querySelector('.segment-timestamp, #timestamp')?.textContent.trim();
+      const text = segment.querySelector('.segment-text, #content')?.textContent.trim();
+      if (timestamp && text) output += `[${timestamp}] ${text}\n`;
+    });
+    return { success: true, data: output };
+}
+
+// Function to render timestamps
+async function renderTimestamps(summaryText) {
+    const container = document.querySelector('.yt-timestamps-container');
+    if (!container) return;
+    container.innerHTML = ''; 
+
+    const panel = document.createElement('div');
+    panel.className = 'yt-timestamps-panel';
+
+    const panelHeader = document.createElement('div');
+    panelHeader.className = 'yt-timestamps-panel-header';
+
+    const headerTitle = document.createElement('h3');
+    headerTitle.className = 'yt-timestamps-panel-header-title';
+    headerTitle.textContent = 'Summary';
+    panelHeader.appendChild(headerTitle);
+
+    const panelContent = document.createElement('div');
+    panelContent.className = 'yt-timestamps-panel-content';
+    
+    const timestampsList = document.createElement('div');
+    timestampsList.className = 'yt-timestamps-list';
+
+    // Process summary text
+    const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
+    let currentSection = null;
+
+    lines.forEach(line => {
+        const cleanLine = line.replace(/```/g, '').trim();
+        if (cleanLine.startsWith('#')) {
+            const sectionHeader = document.createElement('div');
+            sectionHeader.className = 'yt-section-header';
+            sectionHeader.textContent = cleanLine.substring(1).trim();
+            timestampsList.appendChild(sectionHeader);
+            return;
+        }
+
+        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
+        if (timeMatch) {
+            const time = timeMatch[1];
+            const title = timeMatch[2];
+            const description = timeMatch[3];
+
+            let sec = 0;
+            const timeParts = time.split(':').map(Number);
+            if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+            else if (timeParts.length === 2) sec = timeParts[0] * 60 + timeParts[1];
+
+            const tsDiv = document.createElement('div');
+            tsDiv.className = 'yt-timestamp-item';
+
+            const glowBorder = document.createElement('div');
+            glowBorder.className = 'yt-glow-border';
+            tsDiv.appendChild(glowBorder);
+
+            const timeLabel = document.createElement('span');
+            timeLabel.className = 'yt-time-label';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'yt-time';
+            timeSpan.textContent = `[${time}]`;
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'yt-title';
+            titleSpan.textContent = title;
+            
+            timeLabel.appendChild(timeSpan);
+            timeLabel.appendChild(titleSpan);
+            timeLabel.appendChild(titleSpan);
+            timeLabel.appendChild(titleSpan);
+            
+            const expandBtn = document.createElement('span');
+            expandBtn.textContent = '▼';
+            expandBtn.className = 'yt-expand-btn';
+
+            tsDiv.appendChild(timeLabel);
+            tsDiv.appendChild(expandBtn);
+
+            const accordionContent = document.createElement('div');
+            accordionContent.className = 'yt-accordion-content';
+            accordionContent.textContent = description;
+
+            let isExpanded = false;
+            expandBtn.onclick = e => {
+                e.stopPropagation();
+                isExpanded = !isExpanded;
+                if (isExpanded) {
+                    accordionContent.classList.add('expanded');
+                    expandBtn.style.transform = 'rotate(180deg)';
+                } else {
+                    accordionContent.classList.remove('expanded');
+                    expandBtn.style.transform = 'rotate(0deg)';
+                }
+            };
+
+            tsDiv.onclick = () => {
+                const video = document.querySelector('video');
+                if (video) video.currentTime = sec;
+            };
+
+            timestampsList.appendChild(tsDiv);
+            timestampsList.appendChild(accordionContent);
+        }
+    });
+
+    panelContent.appendChild(timestampsList);
+    panel.appendChild(panelHeader);
+    panel.appendChild(panelContent);
+    container.appendChild(panel);
+}
+
+// Helper function for sleep
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
