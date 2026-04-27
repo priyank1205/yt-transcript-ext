@@ -13,13 +13,13 @@
     "https://generativelanguage.googleapis.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/service-worker.js"
   },
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/watch?v=*"],
-      "css": ["scripts/content.css"],
-      "js": ["scripts/content.js"]
+      "js": ["scripts/constants.js", "scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
+      "css": ["styles/content.css"]
     }
   ]
 }
