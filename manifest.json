@@ -17,6 +17,7 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
+  "options_page": "options/options.html",
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/watch?v=*"],
