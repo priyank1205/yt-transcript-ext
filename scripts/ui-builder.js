@@ -40,7 +40,7 @@ function injectSidebar(secondary) {
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Summary';
     
-// Create model selection dropdown
+    // Create model selection dropdown
     const headerModelSelect = document.createElement('select');
     headerModelSelect.id = 'header-model-select';
     headerModelSelect.className = 'yt-timestamps-model-select';
@@ -67,6 +67,53 @@ function injectSidebar(secondary) {
     panelHeader.appendChild(headerModelSelect);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
+    
+    // Create settings panel element
+    const settingsPanel = document.createElement('div');
+    settingsPanel.className = 'yt-timestamp-settings-panel';
+    
+    // Create model selection dropdown
+    const modelLabel = document.createElement('div');
+    modelLabel.className = 'yt-timestamp-settings-label';
+    modelLabel.textContent = 'Model';
+    
+    const modelSelect = document.createElement('select');
+    modelSelect.id = 'model-select';
+    modelSelect.className = 'yt-timestamp-settings-input';
+    
+    const geminiOptionSelect = document.createElement('option');
+    geminiOptionSelect.value = 'gemini';
+    geminiOptionSelect.textContent = 'Gemini';
+    
+    const mistralOptionSelect = document.createElement('option');
+    mistralOptionSelect.value = 'mistral';
+    mistralOptionSelect.textContent = 'Mistral';
+    
+    modelSelect.appendChild(geminiOptionSelect);
+    modelSelect.appendChild(mistralOptionSelect);
+    
+    // Create API key fields
+    const geminiKeyLabel = document.createElement('div');
+    geminiKeyLabel.className = 'yt-timestamp-settings-label';
+    geminiKeyLabel.textContent = 'Gemini API Key';
+    
+    const geminiKeyInput = document.createElement('input');
+    geminiKeyInput.type = 'text';
+    geminiKeyInput.id = 'gemini-api-key-input';
+    geminiKeyInput.placeholder = 'Enter Gemini API Key';
+    geminiKeyInput.className = 'yt-timestamp-settings-input';
+    
+    const mistralKeyLabel = document.createElement('div');
+    mistralKeyLabel.className = 'yt-timestamp-settings-label';
+    mistralKeyLabel.textContent = 'Mistral API Key';
+    mistralKeyLabel.style.display = 'none';
+    
+    const mistralKeyInput = document.createElement('input');
+    mistralKeyInput.type = 'text';
+    mistralKeyInput.id = 'mistral-api-key-input';
+    mistralKeyInput.placeholder = 'Enter Mistral API Key';
+    mistralKeyInput.className = 'yt-timestamp-settings-input';
+    mistralKeyInput.style.display = 'none';
     
     // Add event listener to header model selection
     headerModelSelect.addEventListener('change', (e) => {
@@ -111,6 +158,20 @@ function injectSidebar(secondary) {
         const settingsModelSelect = document.getElementById('model-select');
         if (settingsModelSelect) {
             settingsModelSelect.value = defaultModel;
+        }
+        
+        // Add tooltip functionality for missing API keys
+        if (!hasGeminiKey) {
+            const geminiOption = headerModelSelect.querySelector('option[value="gemini"]');
+            if (geminiOption) {
+                geminiOption.title = "API key required";
+            }
+        }
+        if (!hasMistralKey) {
+            const mistralOption = headerModelSelect.querySelector('option[value="mistral"]');
+            if (mistralOption) {
+                mistralOption.title = "API key required";
+            }
         }
     });
     
