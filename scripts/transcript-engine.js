@@ -51,39 +51,20 @@ function extractFromSegments(segments) {
 }
 
 // Function to render timestamps
-async function renderTimestamps(summaryText) {
-    const container = document.querySelector('.yt-timestamps-container');
-    if (!container) return;
-    container.innerHTML = ''; 
-
-    const panel = document.createElement('div');
-    panel.className = 'yt-timestamps-panel';
-
-    const panelHeader = document.createElement('div');
-    panelHeader.className = 'yt-timestamps-panel-header';
-
-    const headerTitle = document.createElement('h3');
-    headerTitle.className = 'yt-timestamps-panel-header-title';
-    headerTitle.textContent = 'Summary';
-    panelHeader.appendChild(headerTitle);
-
-    const panelContent = document.createElement('div');
-    panelContent.className = 'yt-timestamps-panel-content';
-    
-    const timestampsList = document.createElement('div');
-    timestampsList.className = 'yt-timestamps-list';
-
-    // Process summary text
+function renderTimestamps(summaryText) {
+    // Process summary text and return structured data instead of building UI
     const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
-    let currentSection = null;
+    const result = {
+        sections: [],
+        timestamps: []
+    };
 
     lines.forEach(line => {
         const cleanLine = line.replace(/```/g, '').trim();
         if (cleanLine.startsWith('#')) {
-            const sectionHeader = document.createElement('div');
-            sectionHeader.className = 'yt-section-header';
-            sectionHeader.textContent = cleanLine.substring(1).trim();
-            timestampsList.appendChild(sectionHeader);
+            result.sections.push({
+                title: cleanLine.substring(1).trim()
+            });
             return;
         }
 
@@ -98,57 +79,16 @@ async function renderTimestamps(summaryText) {
             if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
             else if (timeParts.length === 2) sec = timeParts[0] * 60 + timeParts[1];
 
-            const tsDiv = document.createElement('div');
-            tsDiv.className = 'yt-timestamp-item';
-
-            const glowBorder = document.createElement('div');
-            glowBorder.className = 'yt-glow-border';
-            tsDiv.appendChild(glowBorder);
-
-            const timeLabel = document.createElement('span');
-            timeLabel.className = 'yt-time-label';
-            timeLabel.innerHTML = `<span class="yt-time">[${time}]</span> <span class="yt-title">${title}</span>`;
-            
-            const expandBtn = document.createElement('span');
-            expandBtn.textContent = '▼';
-            expandBtn.className = 'yt-expand-btn';
-
-            tsDiv.appendChild(timeLabel);
-            tsDiv.appendChild(expandBtn);
-
-            const accordionContent = document.createElement('div');
-            accordionContent.className = 'yt-accordion-content';
-            accordionContent.textContent = description;
-
-            let isExpanded = false;
-            expandBtn.onclick = e => {
-                e.stopPropagation();
-                isExpanded = !isExpanded;
-                if (isExpanded) {
-                    accordionContent.classList.add('expanded');
-                    expandBtn.style.transform = 'rotate(180deg)';
-                } else {
-                    accordionContent.classList.remove('expanded');
-                    expandBtn.style.transform = 'rotate(0deg)';
-                }
-            };
-
-            tsDiv.onmouseover = () => { tsDiv.style.background = '#262626'; glowBorder.style.opacity = '1'; };
-            tsDiv.onmouseout = () => { tsDiv.style.background = '#1a1a1a'; glowBorder.style.opacity = '0'; };
-            tsDiv.onclick = () => {
-                const video = document.querySelector('video');
-                if (video) video.currentTime = sec;
-            };
-
-            timestampsList.appendChild(tsDiv);
-            timestampsList.appendChild(accordionContent);
+            result.timestamps.push({
+                time: time,
+                title: title,
+                description: description,
+                seconds: sec
+            });
         }
     });
 
-    panelContent.appendChild(timestampsList);
-    panel.appendChild(panelHeader);
-    panel.appendChild(panelContent);
-    container.appendChild(panel);
+    return result;
 }
 
 // Helper function for sleep
