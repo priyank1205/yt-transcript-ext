@@ -252,7 +252,7 @@ function injectSidebar(secondary) {
     genBtn.className = 'yt-timestamps-generate-button';
     genBtn.onclick = () => {
         console.log('Generate button clicked');
-        genBtn.textContent = 'Analyzing...';
+        updateGenerateButton('extracting');
         try {
             const headerModelSelect = document.getElementById('header-model-select');
             const selectedModel = headerModelSelect ? headerModelSelect.value : 'gemini';
@@ -260,22 +260,20 @@ function injectSidebar(secondary) {
             chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: selectedModel }, (res) => {
                 if (chrome.runtime.lastError) {
                     console.error('Extension context error:', chrome.runtime.lastError);
-                    genBtn.textContent = 'Error: Context invalidated';
-                    setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
+                    updateGenerateButton('error', 'Context invalidated');
                     return;
                 }
                 if (!res || !res.success) {
                     console.log(`Error occurred: ${res?.error || 'Unknown'}`);
-                    genBtn.textContent = 'Error: ' + (res?.error || 'Unknown');
-                    setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
+                    updateGenerateButton('error', res?.error || 'Unknown error');
                 } else {
                     console.log(`Summary received from ${selectedModel}`);
+                    updateGenerateButton('done');
                 }
             });
         } catch (e) {
             console.error('Extension context invalidated:', e);
-            genBtn.textContent = 'Error: Extension context invalidated';
-            setTimeout(() => genBtn.textContent = 'Generate summary', 3000);
+            updateGenerateButton('error', 'Extension context invalidated');
         }
     };
     
@@ -288,6 +286,38 @@ function injectSidebar(secondary) {
     
     // Insert container into secondary
     secondary.insertBefore(container, secondary.firstChild);
+}
+
+// Function to update the generate button state
+function updateGenerateButton(phase, message) {
+    const genBtn = document.querySelector('.yt-timestamps-generate-button');
+    if (!genBtn) return;
+
+    const resetButton = () => {
+        genBtn.innerHTML = 'Generate summary';
+        genBtn.disabled = false;
+        genBtn.classList.remove('yt-error-state');
+    };
+
+    switch (phase) {
+        case 'extracting':
+            genBtn.disabled = true;
+            genBtn.classList.remove('yt-error-state');
+            genBtn.innerHTML = '<span class="yt-spinner"></span>Extracting transcript...';
+            break;
+        case 'calling_api':
+            genBtn.innerHTML = '<span class="yt-spinner"></span>Generating summary...';
+            break;
+        case 'error':
+            genBtn.classList.add('yt-error-state');
+            genBtn.innerHTML = message || 'Something went wrong';
+            genBtn.disabled = false;
+            setTimeout(resetButton, 3000);
+            break;
+        case 'done':
+            resetButton();
+            break;
+    }
 }
 
 // Function to toggle settings panel visibility
@@ -410,6 +440,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     injectSidebar,
     toggleSettings,
-    renderTimestampsUI
+    renderTimestampsUI,
+    updateGenerateButton
   };
 }

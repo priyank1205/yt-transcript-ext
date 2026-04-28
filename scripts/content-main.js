@@ -58,5 +58,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         sendResponse({ success: true });
         return true;
+    } else if (request.action === "PROGRESS_UPDATE") {
+        if (typeof updateGenerateButton === 'function') {
+            updateGenerateButton(request.phase, request.message);
+        }
+        sendResponse({ success: true });
+        return true;
     }
 });

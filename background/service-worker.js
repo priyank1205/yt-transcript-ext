@@ -34,13 +34,16 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     console.log(`Created LLM client for model: ${llmClient.getModelName()}`);
     
     // 3. Fetch transcript from content script with retry
+    chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "extracting" });
     console.log('Fetching transcript...');
     const transcriptResponse = await llmClient.fetchTranscriptWithRetry(tab.id);
     console.log('Transcript fetched successfully');
     
     if (!transcriptResponse || !transcriptResponse.success) {
       console.error('Failed to fetch transcript:', transcriptResponse ? transcriptResponse.error : "Could not connect to page.");
-      sendResponse({ success: false, error: transcriptResponse ? transcriptResponse.error : "Could not connect to page." });
+      const errorMsg = transcriptResponse ? transcriptResponse.error : "Could not connect to page.";
+      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
+      sendResponse({ success: false, error: errorMsg });
       return;
     }
     
@@ -52,11 +55,14 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     if (!apiKey) {
       console.error(`API Key not found for ${modelName}`);
-      sendResponse({ success: false, error: `API Key not found for ${modelName}. Please set it in storage.` });
+      const errorMsg = `API Key not found for ${modelName}. Please set it in options.`;
+      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
+      sendResponse({ success: false, error: errorMsg });
       return;
     }
     
     // 5. Call the LLM API
+    chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api" });
     console.log(`Calling ${modelName} API...`);
     const summary = await llmClient.callAPI(apiKey, transcriptResponse.data);
     console.log('API call completed successfully');
@@ -68,6 +74,8 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     chrome.tabs.sendMessage(tab.id, { action: "RENDER_TIMESTAMPS", data: summary });
   } catch (err) {
     console.error('Error in handleGeminiAnalysis:', err);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [null]);
+    if (tab) chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message });
     sendResponse({ success: false, error: err.message });
   }
 }

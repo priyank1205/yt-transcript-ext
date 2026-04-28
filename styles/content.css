@@ -271,3 +271,32 @@
 .yt-timestamp-item:hover .yt-glow-border {
   box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
 }
+
+/* Spinner Animation */
+@keyframes yt-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.yt-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #666;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: yt-spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* Generate Button States */
+.yt-timestamps-generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.yt-error-state {
+  border-color: #ff4444 !important;
+  color: #ff4444 !important;
+}
