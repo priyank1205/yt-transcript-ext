@@ -19,7 +19,14 @@
     }
     
     .option {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .option-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #FF0000;
     }
     
     label {
@@ -48,20 +55,43 @@
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
+      margin-top: 5px;
     }
     
     button:hover {
       background: #cc0000;
     }
+    
+    .model-section {
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #1a1a1a;
+    }
   </style>
 </head>
 <body>
   <h1>YouTube Transcript Extractor Settings</h1>
-  <div class="option">
-    <label for="api-key">Gemini API Key</label>
-    <input type="text" id="api-key" placeholder="Enter your API Key">
-    <button id="save-key">Save</button>
+  
+  <div class="model-section">
+    <div class="option-title">Gemini Settings</div>
+    <div class="option">
+      <label for="gemini-api-key">Gemini API Key</label>
+      <input type="text" id="gemini-api-key" placeholder="Enter your Gemini API Key">
+      <button id="save-gemini-key">Save Gemini Key</button>
+    </div>
   </div>
+  
+  <div class="model-section">
+    <div class="option-title">Mistral Settings</div>
+    <div class="option">
+      <label for="mistral-api-key">Mistral API Key</label>
+      <input type="text" id="mistral-api-key" placeholder="Enter your Mistral API Key">
+      <button id="save-mistral-key">Save Mistral Key</button>
+    </div>
+  </div>
+  
   <script src="options.js"></script>
 </body>
 </html>
