@@ -21,7 +21,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/watch?v=*"],
-      "js": ["scripts/constants.js", "scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
+      "js": ["scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
       "css": ["styles/content.css"]
     }
   ]

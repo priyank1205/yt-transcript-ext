@@ -20,15 +20,6 @@ function initApp() {
     handleNavigation();
 }
 
-// Function to toggle settings panel visibility
-function toggleSettings() {
-    const settingsPanel = document.querySelector('.yt-timestamp-settings-panel');
-    if (settingsPanel) {
-        const isVisible = settingsPanel.style.display === 'block';
-        settingsPanel.style.display = isVisible ? 'none' : 'block';
-    }
-}
-
 function resetSidebar() {
     const container = document.querySelector('.yt-timestamps-container');
     if (container) container.remove();

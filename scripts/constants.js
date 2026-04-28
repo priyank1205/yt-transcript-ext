@@ -147,7 +147,4 @@ Pure summary only.`
   }
 };
 
-// Export constants for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = CONSTANTS;
-}
+export default CONSTANTS;
