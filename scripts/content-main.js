@@ -58,7 +58,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         extractTranscript().then(sendResponse);
         return true;
     } else if (request.action === "RENDER_TIMESTAMPS") {
-        renderTimestamps(request.data);
+        // Use the new renderTimestampsUI function from ui-builder.js
+        if (typeof renderTimestampsUI === 'function') {
+            renderTimestampsUI(request.data);
+        } else {
+            // Fallback to original renderTimestamps if the new function is not available
+            renderTimestamps(request.data);
+        }
         sendResponse({ success: true });
         return true;
     }

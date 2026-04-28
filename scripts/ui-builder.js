@@ -68,6 +68,55 @@ function injectSidebar(secondary) {
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
     
+    // Add event listener to header model selection
+    headerModelSelect.addEventListener('change', (e) => {
+        const selectedModel = e.target.value;
+        // Update header title based on selected model
+        headerTitle.textContent = `${selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1)} Summary`;
+    });
+    
+    // Set default selection based on saved API keys
+    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
+        // Default to Gemini if no model is selected
+        let defaultModel = 'gemini';
+        
+        // Check if we have saved API keys
+        const hasGeminiKey = !!result.GEMINI_API_KEY;
+        const hasMistralKey = !!result.MISTRAL_API_KEY;
+        
+        // Default selection logic:
+        // 1. If only one model has a saved API key, select that model
+        // 2. If both models have saved API keys, select Gemini by default
+        // 3. If neither has a saved API key, default to Gemini
+        if (hasGeminiKey && !hasMistralKey) {
+            defaultModel = 'gemini';
+        } else if (!hasGeminiKey && hasMistralKey) {
+            defaultModel = 'mistral';
+        } else if (hasGeminiKey && hasMistralKey) {
+            defaultModel = 'gemini'; // Both have keys, default to Gemini
+        } else if (!hasGeminiKey && !hasMistralKey) {
+            defaultModel = 'gemini'; // Neither has keys, default to Gemini
+        }
+        
+        // Set the default model in both dropdowns
+        headerModelSelect.value = defaultModel;
+        headerTitle.textContent = `${defaultModel.charAt(0).toUpperCase() + defaultModel.slice(1)} Summary`;
+        
+        // Add tooltip functionality for missing API keys
+        if (!hasGeminiKey) {
+            const geminiOptionElement = headerModelSelect.querySelector('option[value="gemini"]');
+            if (geminiOptionElement) {
+                geminiOptionElement.title = "API key required";
+            }
+        }
+        if (!hasMistralKey) {
+            const mistralOptionElement = headerModelSelect.querySelector('option[value="mistral"]');
+            if (mistralOptionElement) {
+                mistralOptionElement.title = "API key required";
+            }
+        }
+    });
+    
     // Create settings panel element
     const settingsPanel = document.createElement('div');
     settingsPanel.className = 'yt-timestamp-settings-panel';
@@ -115,66 +164,6 @@ function injectSidebar(secondary) {
     mistralKeyInput.className = 'yt-timestamp-settings-input';
     mistralKeyInput.style.display = 'none';
     
-    // Add event listener to header model selection
-    headerModelSelect.addEventListener('change', (e) => {
-        const selectedModel = e.target.value;
-        // Update header title based on selected model
-        headerTitle.textContent = `${selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1)} Summary`;
-        // Sync with settings panel model select
-        const settingsModelSelect = document.getElementById('model-select');
-        if (settingsModelSelect) {
-            settingsModelSelect.value = selectedModel;
-        }
-    });
-    
-    // Set default selection based on saved API keys
-    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        // Default to Gemini if no model is selected
-        let defaultModel = 'gemini';
-        
-        // Check if we have saved API keys
-        const hasGeminiKey = !!result.GEMINI_API_KEY;
-        const hasMistralKey = !!result.MISTRAL_API_KEY;
-        
-        // Default selection logic:
-        // 1. If only one model has a saved API key, select that model
-        // 2. If both models have saved API keys, select Gemini by default
-        // 3. If neither has a saved API key, default to Gemini
-        if (hasGeminiKey && !hasMistralKey) {
-            defaultModel = 'gemini';
-        } else if (!hasGeminiKey && hasMistralKey) {
-            defaultModel = 'mistral';
-        } else if (hasGeminiKey && hasMistralKey) {
-            defaultModel = 'gemini'; // Both have keys, default to Gemini
-        } else if (!hasGeminiKey && !hasMistralKey) {
-            defaultModel = 'gemini'; // Neither has keys, default to Gemini
-        }
-        
-        // Set the default model in both dropdowns
-        headerModelSelect.value = defaultModel;
-        headerTitle.textContent = `${defaultModel.charAt(0).toUpperCase() + defaultModel.slice(1)} Summary`;
-        
-        // Also update the settings model select
-        const settingsModelSelect = document.getElementById('model-select');
-        if (settingsModelSelect) {
-            settingsModelSelect.value = defaultModel;
-        }
-        
-        // Add tooltip functionality for missing API keys
-        if (!hasGeminiKey) {
-            const geminiOption = headerModelSelect.querySelector('option[value="gemini"]');
-            if (geminiOption) {
-                geminiOption.title = "API key required";
-            }
-        }
-        if (!hasMistralKey) {
-            const mistralOption = headerModelSelect.querySelector('option[value="mistral"]');
-            if (mistralOption) {
-                mistralOption.title = "API key required";
-            }
-        }
-    });
-    
     // Add event listener to model selection
     modelSelect.addEventListener('change', (e) => {
         const selectedModel = e.target.value;
@@ -193,9 +182,9 @@ function injectSidebar(secondary) {
         }
         
         // Sync with header model select
-        const headerModelSelect = document.getElementById('header-model-select');
-        if (headerModelSelect) {
-            headerModelSelect.value = selectedModel;
+        const headerModelSelectElement = document.getElementById('header-model-select');
+        if (headerModelSelectElement) {
+            headerModelSelectElement.value = selectedModel;
         }
     });
     
@@ -250,7 +239,6 @@ function injectSidebar(secondary) {
     settingsPanel.appendChild(mistralKeyInput);
     settingsPanel.appendChild(saveBtn);
     
-    // Append settings panel to panel
     panel.appendChild(settingsPanel);
     
     // Create action area element
@@ -311,10 +299,117 @@ function toggleSettings() {
     }
 }
 
+// Function to render timestamps UI from processed data
+function renderTimestampsUI(summaryText) {
+    // This function will build the UI for timestamps
+    const container = document.querySelector('.yt-timestamps-container');
+    if (!container) return;
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Create panel elements
+    const panel = document.createElement('div');
+    panel.className = 'yt-timestamps-panel';
+    
+    const panelHeader = document.createElement('div');
+    panelHeader.className = 'yt-timestamps-panel-header';
+    
+    const headerTitle = document.createElement('h3');
+    headerTitle.className = 'yt-timestamps-panel-header-title';
+    headerTitle.textContent = 'Summary';
+    panelHeader.appendChild(headerTitle);
+    
+    panel.appendChild(panelHeader);
+    container.appendChild(panel);
+    
+    // Create panel content
+    const panelContent = document.createElement('div');
+    panelContent.className = 'yt-timestamps-panel-content';
+    
+    const timestampsList = document.createElement('div');
+    timestampsList.className = 'yt-timestamps-list';
+    
+    // Process summary text
+    const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    lines.forEach(line => {
+        const cleanLine = line.replace(/```/g, '').trim();
+        if (cleanLine.startsWith('#')) {
+            const sectionHeader = document.createElement('div');
+            sectionHeader.className = 'yt-section-header';
+            sectionHeader.textContent = cleanLine.substring(1).trim();
+            timestampsList.appendChild(sectionHeader);
+            return;
+        }
+        
+        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
+        if (timeMatch) {
+            const time = timeMatch[1];
+            const title = timeMatch[2];
+            const description = timeMatch[3]; 
+            let sec = 0;
+            const timeParts = time.split(':').map(Number);
+            if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+            else if (timeParts.length === 2) sec = timeParts[0] * 60 + timeParts[1];
+            
+            const tsDiv = document.createElement('div');
+            tsDiv.className = 'yt-timestamp-item';
+            
+            const glowBorder = document.createElement('div');
+            glowBorder.className = 'yt-glow-border';
+            tsDiv.appendChild(glowBorder);
+            
+            const timeLabel = document.createElement('span');
+            timeLabel.className = 'yt-time-label';
+            timeLabel.innerHTML = `<span class="yt-time">[${time}]</span> <span class="yt-title">${title}</span>`;
+            
+            const expandBtn = document.createElement('span');
+            expandBtn.textContent = '▼';
+            expandBtn.className = 'yt-expand-btn';
+            
+            tsDiv.appendChild(timeLabel);
+            tsDiv.appendChild(expandBtn);
+            
+            const accordionContent = document.createElement('div');
+            accordionContent.className = 'yt-accordion-content';
+            accordionContent.textContent = description;
+            
+            let isExpanded = false;
+            expandBtn.onclick = e => {
+                e.stopPropagation();
+                isExpanded = !isExpanded;
+                if (isExpanded) {
+                    accordionContent.classList.add('expanded');
+                    expandBtn.style.transform = 'rotate(180deg)';
+                } else {
+                    accordionContent.classList.remove('expanded');
+                    expandBtn.style.transform = 'rotate(0deg)';
+                }
+            };
+            
+            tsDiv.onmouseover = () => { tsDiv.style.background = '#262626'; glowBorder.style.opacity = '1'; };
+            tsDiv.onmouseout = () => { tsDiv.style.background = '#1a1a1a'; glowBorder.style.opacity = '0'; };
+            tsDiv.onclick = () => {
+                const video = document.querySelector('video');
+                if (video) video.currentTime = sec;
+            };
+            
+            timestampsList.appendChild(tsDiv);
+            timestampsList.appendChild(accordionContent);
+        }
+    });
+    
+    panelContent.appendChild(timestampsList);
+    panel.appendChild(panelContent);
+    container.appendChild(panel);
+}
+
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     injectSidebar,
-    toggleSettings
+    toggleSettings,
+    renderTimestampsUI
   };
 }
