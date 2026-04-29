@@ -27,11 +27,13 @@ function resetSidebar() {
 
 function handleNavigation() {
     const videoId = new URLSearchParams(window.location.search).get('v');
-    if (videoId && videoId !== currentVideoId) {
+    if (!videoId) {
+        currentVideoId = null;
+        return;
+    }
+    if (videoId !== currentVideoId) {
         currentVideoId = videoId;
         resetSidebar();
-        
-        // Use MutationObserver for DOM changes
         observeDOM();
     }
 }

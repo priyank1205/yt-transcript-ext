@@ -20,7 +20,7 @@
   "options_page": "options/options.html",
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/watch?v=*"],
+      "matches": ["*://*.youtube.com/*"],
       "js": ["scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
       "css": ["styles/content.css"]
     }

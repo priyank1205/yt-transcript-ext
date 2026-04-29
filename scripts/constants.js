@@ -19,6 +19,33 @@ const CONSTANTS = {
     MISTRAL: 'mistral'
   },
   PROMPTS: {
+    SUMMARY_PROMPT_SMALL: `Act as an Expert Video Summarizer. Generate an accurate timestamped summary from the pasted timestamped transcript.
+
+Rules:
+- Timestamps are absolute video-clock timestamps. Use ONLY timestamps that exist in the transcript. Never invent, recalculate, rebase, or normalize timestamps.
+- If the transcript starts at 00:47, the summary starts at 00:47 or later, not 00:00.
+- If the transcript contains 1:25:29, output 1:25:29 exactly.
+
+Segment the full transcript into 10-30 summary points. Cover beginning, middle, and end proportionally. Final point must fall near T_end.
+
+Timestamp format:
+- Under 1 hour: [mm:ss]
+- 1 hour or more: [h:mm:ss]
+- Never flatten hour-based timestamps into total minutes (e.g., never output 63:34 for 1:03:34).
+
+Summary style — use this exact format:
+
+#Section Heading
+[timestamp] - Title: Description
+
+Rules:
+- Section headings group nearby related points.
+- Title is short and specific.
+- Description summarizes the key idea only.
+- Be concise but accurate. No speaker-log notes like "he says".
+
+Output: Return ONLY the final timestamped summary in one fenced code block. No explanations, no notes, no citations.`,
+
     SUMMARY_PROMPT: `Act as an Expert Video Summarizer.
 
 Your job is to generate an accurate timestamped summary from the pasted timestamped transcript.
