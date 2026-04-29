@@ -335,6 +335,10 @@
   pointer-events: none;
 }
 
+.yt-timestamps-generate-button:hover::before {
+  animation: btnShimmerHover 0.8s ease-in-out forwards;
+}
+
 .yt-timestamps-generate-button:hover {
   background: #252020;
   border-color: #953030;
@@ -346,6 +350,11 @@
 }
 
 @keyframes btnShimmer {
+  0% { left: -100%; }
+  100% { left: 150%; }
+}
+
+@keyframes btnShimmerHover {
   0% { left: -100%; }
   100% { left: 150%; }
 }
