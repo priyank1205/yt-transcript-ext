@@ -318,7 +318,21 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.yt-timestamps-generate-button::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -100%;
+  width: 60%;
+  height: calc(100% + 4px);
+  background: linear-gradient(90deg, transparent, rgba(255,0,0,0.6), transparent);
+  animation: btnShimmer 2s ease-in-out 3s 1 forwards;
+  pointer-events: none;
 }
 
 .yt-timestamps-generate-button:hover {
@@ -329,6 +343,11 @@
 .yt-timestamps-generate-button:active {
   background: #1a1616;
   border-color: #601818;
+}
+
+@keyframes btnShimmer {
+  0% { left: -100%; }
+  100% { left: 150%; }
 }
 
 /* Timestamp Item Styles */
