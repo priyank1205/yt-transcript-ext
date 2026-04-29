@@ -35,10 +35,14 @@ function injectSidebar(secondary) {
     const panelHeader = document.createElement('div');
     panelHeader.className = 'yt-timestamps-panel-header';
     
+    // Create left group (title + model selector)
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'yt-timestamps-header-left';
+    
     // Create header title element
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
-    headerTitle.textContent = 'Summary';
+    headerTitle.textContent = 'Timestamped Summary';
     
     // Create model selection dropdown
     const headerModelSelect = document.createElement('select');
@@ -62,17 +66,16 @@ function injectSidebar(secondary) {
     gearIcon.textContent = '⚙️';
     gearIcon.onclick = toggleSettings;
     
-    // Append elements to panel header
-    panelHeader.appendChild(headerTitle);
-    panelHeader.appendChild(headerModelSelect);
+    // Append elements
+    headerLeft.appendChild(headerTitle);
+    headerLeft.appendChild(headerModelSelect);
+    panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
     
     // Add event listener to header model selection
     headerModelSelect.addEventListener('change', (e) => {
         const selectedModel = e.target.value;
-        // Update header title based on selected model
-        headerTitle.textContent = `${selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1)} Summary`;
     });
     
     // Set default selection based on saved API keys
@@ -100,7 +103,6 @@ function injectSidebar(secondary) {
         
         // Set the default model in both dropdowns
         headerModelSelect.value = defaultModel;
-        headerTitle.textContent = `${defaultModel.charAt(0).toUpperCase() + defaultModel.slice(1)} Summary`;
         
         // Add tooltip functionality for missing API keys
         if (!hasGeminiKey) {
@@ -241,6 +243,23 @@ function injectSidebar(secondary) {
     
     panel.appendChild(settingsPanel);
     
+    // Create panel body (empty state before generation)
+    const panelBody = document.createElement('div');
+    panelBody.className = 'yt-timestamps-panel-body';
+    
+    const emptyState = document.createElement('div');
+    emptyState.className = 'yt-timestamps-empty-state';
+    emptyState.innerHTML = `
+        <div class="yt-empty-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+        </div>
+        <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
+    `;
+    panelBody.appendChild(emptyState);
+    
     // Create action area element
     const actionArea = document.createElement('div');
     actionArea.id = 'action-area';
@@ -279,7 +298,8 @@ function injectSidebar(secondary) {
     
     // Append elements to action area
     actionArea.appendChild(genBtn);
-    panel.appendChild(actionArea);
+    panelBody.appendChild(actionArea);
+    panel.appendChild(panelBody);
     
     // Append panel to container
     container.appendChild(panel);
@@ -348,7 +368,7 @@ function renderTimestampsUI(summaryText) {
     
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
-    headerTitle.textContent = 'Summary';
+    headerTitle.textContent = 'Timestamped Summary';
     
     const toggleIcon = document.createElement('span');
     toggleIcon.className = 'yt-accordion-toggle-icon';

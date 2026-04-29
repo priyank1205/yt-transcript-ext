@@ -90,8 +90,8 @@
 /* Panel Header Styles */
 .yt-timestamps-panel-header {
   background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
-  padding: 14px 16px;
-  border-bottom: 2px solid #FF0000;
+  padding: 12px 16px;
+  border-bottom: 2px solid #591010;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -99,6 +99,12 @@
   border-top-right-radius: 16px;
   cursor: pointer;
   user-select: none;
+}
+
+.yt-timestamps-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .yt-timestamps-panel-header h3 {
@@ -111,6 +117,13 @@
 .yt-timestamps-panel-header .gear-icon {
   cursor: pointer;
   font-size: 16px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.yt-timestamps-panel-header .gear-icon:hover {
+  opacity: 1;
+  transform: rotate(30deg);
 }
 
 /* Accordion Toggle Icon */
@@ -148,16 +161,55 @@
   overflow: hidden !important;
 }
 
+/* Panel Body (empty state) */
+.yt-timestamps-panel-body {
+  padding: 0;
+}
+
+.yt-timestamps-empty-state {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: left;
+}
+
+.yt-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.yt-empty-text {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.4;
+}
+
 /* Model selection dropdown styles */
 .yt-timestamps-model-select {
-  background: #000;
-  color: #fff;
+  background: #1a1a1a;
+  color: #ccc;
   border: 1px solid #444;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  font-weight: normal;
-  margin: 0 8px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.yt-timestamps-model-select:hover {
+  border-color: #666;
+  background: #222;
+}
+
+.yt-timestamps-model-select:focus {
+  border-color: #FF0000;
 }
 
 /* Timestamp Settings Panel Styles */
@@ -219,18 +271,32 @@
 
 /* Action Area Styles */
 #action-area {
-  padding: 14px;
+  padding: 0 16px 20px;
 }
 
-#action-area button {
+/* Generate Button */
+.yt-timestamps-generate-button {
   width: 100%;
-  padding: 10px;
-  background: #333;
+  padding: 12px 20px;
+  background: #1e1a1a;
   color: #fff;
-  border: 1px solid #555;
-  border-radius: 20px;
+  border: 2px solid #752020;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: bold;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+}
+
+.yt-timestamps-generate-button:hover {
+  background: #252020;
+  border-color: #953030;
+}
+
+.yt-timestamps-generate-button:active {
+  background: #1a1616;
+  border-color: #601818;
 }
 
 /* Timestamp Item Styles */
@@ -332,8 +398,13 @@
 
 /* Generate Button States */
 .yt-timestamps-generate-button:disabled {
-  opacity: 0.6;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.yt-timestamps-generate-button:disabled:hover {
+  background: #1e1a1a;
+  border-color: #752020;
 }
 
 .yt-error-state {
