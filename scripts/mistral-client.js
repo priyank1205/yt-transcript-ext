@@ -57,6 +57,18 @@ Here is the transcript: ${transcript}`;
     const result = await response.json();
     console.log('Parsed response:', result);
     
+    // Check for API errors first
+    if (!response.ok || result.error) {
+      const status = response.status;
+      let errorMsg;
+      if (status === 401) errorMsg = 'Invalid API key. Please check your settings.';
+      else if (status === 403) errorMsg = 'API key expired or unauthorized. Please check your settings.';
+      else if (status === 429) errorMsg = 'Rate limit exceeded. Please try again later.';
+      else if (status >= 500) errorMsg = 'Mistral service unavailable. Please try again later.';
+      else errorMsg = result.error?.message || `Mistral API error: ${status}`;
+      throw new Error(errorMsg);
+    }
+    
     if (result.choices && result.choices[0].message.content) {
       console.log('Successfully got response from Mistral');
       return result.choices[0].message.content;

@@ -49,6 +49,10 @@ function injectSidebar(secondary) {
     headerModelSelect.id = 'header-model-select';
     headerModelSelect.className = 'yt-timestamps-model-select';
     
+    const autoOption = document.createElement('option');
+    autoOption.value = 'auto';
+    autoOption.textContent = 'Auto';
+    
     const geminiOption = document.createElement('option');
     geminiOption.value = 'gemini';
     geminiOption.textContent = 'Gemini';
@@ -57,6 +61,7 @@ function injectSidebar(secondary) {
     mistralOption.value = 'mistral';
     mistralOption.textContent = 'Mistral';
     
+    headerModelSelect.appendChild(autoOption);
     headerModelSelect.appendChild(geminiOption);
     headerModelSelect.appendChild(mistralOption);
     
@@ -76,47 +81,27 @@ function injectSidebar(secondary) {
     // Add event listener to header model selection
     headerModelSelect.addEventListener('change', (e) => {
         const selectedModel = e.target.value;
+        // Sync with settings model select
+        const settingsModelSelect = document.getElementById('model-select');
+        if (settingsModelSelect) {
+            settingsModelSelect.value = selectedModel;
+        }
+        // Save selection
+        chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
     });
     
     // Set default selection based on saved API keys
     chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        // Default to Gemini if no model is selected
-        let defaultModel = 'gemini';
+        // Default to auto
+        let defaultModel = 'auto';
         
-        // Check if we have saved API keys
-        const hasGeminiKey = !!result.GEMINI_API_KEY;
-        const hasMistralKey = !!result.MISTRAL_API_KEY;
-        
-        // Default selection logic:
-        // 1. If only one model has a saved API key, select that model
-        // 2. If both models have saved API keys, select Gemini by default
-        // 3. If neither has a saved API key, default to Gemini
-        if (hasGeminiKey && !hasMistralKey) {
-            defaultModel = 'gemini';
-        } else if (!hasGeminiKey && hasMistralKey) {
-            defaultModel = 'mistral';
-        } else if (hasGeminiKey && hasMistralKey) {
-            defaultModel = 'gemini'; // Both have keys, default to Gemini
-        } else if (!hasGeminiKey && !hasMistralKey) {
-            defaultModel = 'gemini'; // Neither has keys, default to Gemini
+        // If a specific model was previously saved, use it
+        if (result.SELECTED_MODEL) {
+            defaultModel = result.SELECTED_MODEL;
         }
         
         // Set the default model in both dropdowns
         headerModelSelect.value = defaultModel;
-        
-        // Add tooltip functionality for missing API keys
-        if (!hasGeminiKey) {
-            const geminiOptionElement = headerModelSelect.querySelector('option[value="gemini"]');
-            if (geminiOptionElement) {
-                geminiOptionElement.title = "API key required";
-            }
-        }
-        if (!hasMistralKey) {
-            const mistralOptionElement = headerModelSelect.querySelector('option[value="mistral"]');
-            if (mistralOptionElement) {
-                mistralOptionElement.title = "API key required";
-            }
-        }
     });
     
     // Create settings panel element
@@ -188,6 +173,9 @@ function injectSidebar(secondary) {
         if (headerModelSelectElement) {
             headerModelSelectElement.value = selectedModel;
         }
+        
+        // Save selection
+        chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
     });
     
     // Create save button
@@ -277,28 +265,57 @@ function injectSidebar(secondary) {
             settingsPanel.style.display = 'none';
         }
         updateGenerateButton('extracting');
-        try {
-            const headerModelSelect = document.getElementById('header-model-select');
-            const selectedModel = headerModelSelect ? headerModelSelect.value : 'gemini';
-            console.log(`Prompt sent to ${selectedModel}`);
-            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: selectedModel }, (res) => {
-                if (chrome.runtime.lastError) {
-                    console.error('Extension context error:', chrome.runtime.lastError);
-                    updateGenerateButton('error', 'Context invalidated');
-                    return;
-                }
-                if (!res || !res.success) {
-                    console.log(`Error occurred: ${res?.error || 'Unknown'}`);
-                    updateGenerateButton('error', res?.error || 'Unknown error');
-                } else {
-                    console.log(`Summary received from ${selectedModel}`);
-                    updateGenerateButton('done');
-                }
+        
+        const headerModelSelect = document.getElementById('header-model-select');
+        const selectedModel = headerModelSelect ? headerModelSelect.value : 'auto';
+        
+        // Send analysis request with timeout
+        const sendAnalysis = (model, timeout = 120000) => {
+            return new Promise((resolve) => {
+                console.log(`Prompt sent to ${model}`);
+                let resolved = false;
+                
+                const timer = setTimeout(() => {
+                    if (!resolved) {
+                        console.log(`Request to ${model} timed out`);
+                        resolved = true;
+                        resolve({ success: false, error: `Request timed out` });
+                    }
+                }, timeout);
+                
+                chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model }, (res) => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timer);
+                        console.log(`Response received:`, res);
+                        if (chrome.runtime.lastError) {
+                            console.error(`Error:`, chrome.runtime.lastError.message);
+                            resolve({ success: false, error: chrome.runtime.lastError.message });
+                        } else {
+                            resolve(res || { success: false, error: 'No response from background' });
+                        }
+                    }
+                });
             });
-        } catch (e) {
-            console.error('Extension context invalidated:', e);
-            updateGenerateButton('error', 'Extension context invalidated');
-        }
+        };
+        
+        // Main execution
+        (async () => {
+            try {
+                const result = await sendAnalysis(selectedModel);
+                
+                if (result && result.success) {
+                    console.log(`Summary received via ${result.model || selectedModel}`);
+                    updateGenerateButton('done');
+                } else {
+                    console.log(`Error: ${result?.error || 'Unknown'}`);
+                    updateGenerateButton('error', result?.error || 'Unknown error');
+                }
+            } catch (e) {
+                console.error('Extension context invalidated:', e);
+                updateGenerateButton('error', 'Extension context invalidated');
+            }
+        })();
     };
     
     // Append elements to action area
@@ -314,9 +331,16 @@ function injectSidebar(secondary) {
 }
 
 // Function to update the generate button state
+let _buttonResetTimeout = null;
 function updateGenerateButton(phase, message) {
     const genBtn = document.querySelector('.yt-timestamps-generate-button');
     if (!genBtn) return;
+
+    // Clear any pending reset timeout
+    if (_buttonResetTimeout) {
+        clearTimeout(_buttonResetTimeout);
+        _buttonResetTimeout = null;
+    }
 
     const resetButton = () => {
         genBtn.innerHTML = 'Generate summary';
@@ -331,13 +355,15 @@ function updateGenerateButton(phase, message) {
             genBtn.innerHTML = '<span class="yt-spinner"></span>Extracting transcript...';
             break;
         case 'calling_api':
+            genBtn.disabled = true;
+            genBtn.classList.remove('yt-error-state');
             genBtn.innerHTML = '<span class="yt-spinner"></span>Generating summary...';
             break;
         case 'error':
             genBtn.classList.add('yt-error-state');
             genBtn.innerHTML = message || 'Something went wrong';
             genBtn.disabled = false;
-            setTimeout(resetButton, 3000);
+            _buttonResetTimeout = setTimeout(resetButton, 3000);
             break;
         case 'done':
             resetButton();
