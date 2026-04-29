@@ -344,18 +344,23 @@ function renderTimestampsUI(summaryText) {
     
     const panelHeader = document.createElement('div');
     panelHeader.className = 'yt-timestamps-panel-header';
+    panelHeader.style.cursor = 'pointer';
     
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Summary';
+    
+    const toggleIcon = document.createElement('span');
+    toggleIcon.className = 'yt-accordion-toggle-icon';
+    toggleIcon.textContent = '›';
+    
     panelHeader.appendChild(headerTitle);
-    
+    panelHeader.appendChild(toggleIcon);
     panel.appendChild(panelHeader);
-    container.appendChild(panel);
     
-    // Create panel content
+    // Create panel content (accordion body)
     const panelContent = document.createElement('div');
-    panelContent.className = 'yt-timestamps-panel-content';
+    panelContent.className = 'yt-timestamps-panel-content yt-accordion-body';
     
     const timestampsList = document.createElement('div');
     timestampsList.className = 'yt-timestamps-list';
@@ -395,7 +400,7 @@ function renderTimestampsUI(summaryText) {
             timeLabel.innerHTML = `<span class="yt-time">[${time}]</span> <span class="yt-title">${title}</span>`;
             
             const expandBtn = document.createElement('span');
-            expandBtn.textContent = '▼';
+            expandBtn.textContent = '+';
             expandBtn.className = 'yt-expand-btn';
             
             tsDiv.appendChild(timeLabel);
@@ -409,12 +414,11 @@ function renderTimestampsUI(summaryText) {
             expandBtn.onclick = e => {
                 e.stopPropagation();
                 isExpanded = !isExpanded;
+                expandBtn.textContent = isExpanded ? '−' : '+';
                 if (isExpanded) {
                     accordionContent.classList.add('expanded');
-                    expandBtn.style.transform = 'rotate(180deg)';
                 } else {
                     accordionContent.classList.remove('expanded');
-                    expandBtn.style.transform = 'rotate(0deg)';
                 }
             };
             
@@ -433,6 +437,19 @@ function renderTimestampsUI(summaryText) {
     panelContent.appendChild(timestampsList);
     panel.appendChild(panelContent);
     container.appendChild(panel);
+    
+    // Accordion toggle for the entire summary
+    let isSummaryExpanded = true;
+    panelHeader.addEventListener('click', () => {
+        isSummaryExpanded = !isSummaryExpanded;
+        if (isSummaryExpanded) {
+            panelContent.classList.remove('collapsed');
+            toggleIcon.classList.remove('collapsed');
+        } else {
+            panelContent.classList.add('collapsed');
+            toggleIcon.classList.add('collapsed');
+        }
+    });
 }
 
 // Export functions for use in other modules
