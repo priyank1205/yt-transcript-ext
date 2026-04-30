@@ -20,6 +20,11 @@ function getClient(modelName) {
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "OPEN_OPTIONS") {
+    const optionsUrl = chrome.runtime.getURL('options/options.html');
+    chrome.tabs.create({ url: optionsUrl });
+    return;
+  }
   if (request.action === "START_GEMINI_ANALYSIS") {
     handleGeminiAnalysis(sendResponse, request.model).catch(err => {
       console.error('Unhandled error in handleGeminiAnalysis:', err);

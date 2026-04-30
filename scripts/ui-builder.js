@@ -68,8 +68,10 @@ function injectSidebar(secondary) {
     // Create gear icon element
     const gearIcon = document.createElement('span');
     gearIcon.className = 'gear-icon';
-    gearIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
-    gearIcon.onclick = toggleSettings;
+    gearIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gearIcon.onclick = () => {
+        chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" });
+    };
     
     // Append elements
     headerLeft.appendChild(headerTitle);
@@ -81,155 +83,17 @@ function injectSidebar(secondary) {
     // Add event listener to header model selection
     headerModelSelect.addEventListener('change', (e) => {
         const selectedModel = e.target.value;
-        // Sync with settings model select
-        const settingsModelSelect = document.getElementById('model-select');
-        if (settingsModelSelect) {
-            settingsModelSelect.value = selectedModel;
-        }
-        // Save selection
         chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
     });
     
     // Set default selection based on saved API keys
     chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        // Default to auto
         let defaultModel = 'auto';
-        
-        // If a specific model was previously saved, use it
         if (result.SELECTED_MODEL) {
             defaultModel = result.SELECTED_MODEL;
         }
-        
-        // Set the default model in both dropdowns
         headerModelSelect.value = defaultModel;
     });
-    
-    // Create settings panel element
-    const settingsPanel = document.createElement('div');
-    settingsPanel.className = 'yt-timestamp-settings-panel';
-    
-    // Create model selection dropdown
-    const modelLabel = document.createElement('div');
-    modelLabel.className = 'yt-timestamp-settings-label';
-    modelLabel.textContent = 'Model';
-    
-    const modelSelect = document.createElement('select');
-    modelSelect.id = 'model-select';
-    modelSelect.className = 'yt-timestamp-settings-input';
-    
-    const geminiOptionSelect = document.createElement('option');
-    geminiOptionSelect.value = 'gemini';
-    geminiOptionSelect.textContent = 'Gemini';
-    
-    const mistralOptionSelect = document.createElement('option');
-    mistralOptionSelect.value = 'mistral';
-    mistralOptionSelect.textContent = 'Mistral';
-    
-    modelSelect.appendChild(geminiOptionSelect);
-    modelSelect.appendChild(mistralOptionSelect);
-    
-    // Create API key fields
-    const geminiKeyLabel = document.createElement('div');
-    geminiKeyLabel.className = 'yt-timestamp-settings-label';
-    geminiKeyLabel.textContent = 'Gemini API Key';
-    
-    const geminiKeyInput = document.createElement('input');
-    geminiKeyInput.type = 'text';
-    geminiKeyInput.id = 'gemini-api-key-input';
-    geminiKeyInput.placeholder = 'Enter Gemini API Key';
-    geminiKeyInput.className = 'yt-timestamp-settings-input';
-    
-    const mistralKeyLabel = document.createElement('div');
-    mistralKeyLabel.className = 'yt-timestamp-settings-label';
-    mistralKeyLabel.textContent = 'Mistral API Key';
-    mistralKeyLabel.style.display = 'none';
-    
-    const mistralKeyInput = document.createElement('input');
-    mistralKeyInput.type = 'text';
-    mistralKeyInput.id = 'mistral-api-key-input';
-    mistralKeyInput.placeholder = 'Enter Mistral API Key';
-    mistralKeyInput.className = 'yt-timestamp-settings-input';
-    mistralKeyInput.style.display = 'none';
-    
-    // Add event listener to model selection
-    modelSelect.addEventListener('change', (e) => {
-        const selectedModel = e.target.value;
-        
-        // Show/hide API key fields based on selection
-        if (selectedModel === 'gemini') {
-            geminiKeyLabel.style.display = 'block';
-            geminiKeyInput.style.display = 'block';
-            mistralKeyLabel.style.display = 'none';
-            mistralKeyInput.style.display = 'none';
-        } else {
-            geminiKeyLabel.style.display = 'none';
-            geminiKeyInput.style.display = 'none';
-            mistralKeyLabel.style.display = 'block';
-            mistralKeyInput.style.display = 'block';
-        }
-        
-        // Sync with header model select
-        const headerModelSelectElement = document.getElementById('header-model-select');
-        if (headerModelSelectElement) {
-            headerModelSelectElement.value = selectedModel;
-        }
-        
-        // Save selection
-        chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
-    });
-    
-    // Create save button
-    const saveBtn = document.createElement('button');
-    saveBtn.id = 'save-key-btn';
-    saveBtn.textContent = 'Save';
-    saveBtn.className = 'yt-timestamp-settings-button';
-    saveBtn.disabled = true;
-    
-    // Add input event listeners
-    geminiKeyInput.addEventListener('input', () => {
-        const hasValue = geminiKeyInput.value.trim().length > 0;
-        saveBtn.disabled = !hasValue;
-    });
-    
-    mistralKeyInput.addEventListener('input', () => {
-        const hasValue = mistralKeyInput.value.trim().length > 0;
-        saveBtn.disabled = !hasValue;
-    });
-    
-    // Add save button event listener
-    saveBtn.onclick = () => {
-        try {
-            const selectedModel = modelSelect.value;
-            const storageKey = `${selectedModel.toUpperCase()}_API_KEY`;
-            const inputId = `${selectedModel}-api-key-input`;
-            const apiKey = document.getElementById(inputId).value;
-            
-            chrome.storage.local.set({ [storageKey]: apiKey }, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error saving API key:', chrome.runtime.lastError);
-                    return;
-                }
-                saveBtn.textContent = 'Saved!';
-                setTimeout(() => {
-                    saveBtn.textContent = 'Save';
-                    toggleSettings(); // Close panel after saving
-                }, 1000);
-            });
-        } catch (e) {
-            console.error('Extension context invalidated:', e);
-        }
-    };
-    
-    // Append elements to settings panel
-    settingsPanel.appendChild(modelLabel);
-    settingsPanel.appendChild(modelSelect);
-    settingsPanel.appendChild(geminiKeyLabel);
-    settingsPanel.appendChild(geminiKeyInput);
-    settingsPanel.appendChild(mistralKeyLabel);
-    settingsPanel.appendChild(mistralKeyInput);
-    settingsPanel.appendChild(saveBtn);
-    
-    panel.appendChild(settingsPanel);
     
     // Create panel body (empty state before generation)
     const panelBody = document.createElement('div');
@@ -259,11 +123,6 @@ function injectSidebar(secondary) {
     genBtn.className = 'yt-timestamps-generate-button';
     genBtn.onclick = () => {
         console.log('Generate button clicked');
-        // Close settings panel if open
-        const settingsPanel = document.querySelector('.yt-timestamp-settings-panel');
-        if (settingsPanel && settingsPanel.style.display === 'block') {
-            settingsPanel.style.display = 'none';
-        }
         updateGenerateButton('extracting');
         
         const headerModelSelect = document.getElementById('header-model-select');
@@ -368,15 +227,6 @@ function updateGenerateButton(phase, message) {
         case 'done':
             resetButton();
             break;
-    }
-}
-
-// Function to toggle settings panel visibility
-function toggleSettings() {
-    const settingsPanel = document.querySelector('.yt-timestamp-settings-panel');
-    if (settingsPanel) {
-        const isVisible = settingsPanel.style.display === 'block';
-        settingsPanel.style.display = isVisible ? 'none' : 'block';
     }
 }
 
@@ -507,7 +357,6 @@ function renderTimestampsUI(summaryText) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     injectSidebar,
-    toggleSettings,
     renderTimestampsUI,
     updateGenerateButton
   };
