@@ -60,5 +60,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         sendResponse({ success: true });
         return true;
+    } else if (request.action === "KEYS_CHANGED") {
+        const selectEl = document.getElementById('header-model-select');
+        if (typeof updateModelDropdown === 'function') {
+            updateModelDropdown(selectEl);
+        }
+        sendResponse({ success: true });
+        return true;
     }
 });

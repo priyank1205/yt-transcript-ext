@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveKey(saveGeminiBtn, { GEMINI_API_KEY: key }, () => {
       updateStatus(geminiStatus, true);
       showToast('Gemini key saved');
+      chrome.runtime.sendMessage({ action: "KEYS_CHANGED" });
     });
   });
 
@@ -115,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveKey(saveMistralBtn, { MISTRAL_API_KEY: key }, () => {
       updateStatus(mistralStatus, true);
       showToast('Mistral key saved');
+      chrome.runtime.sendMessage({ action: "KEYS_CHANGED" });
     });
   });
 

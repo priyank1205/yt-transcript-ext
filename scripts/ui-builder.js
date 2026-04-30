@@ -86,14 +86,8 @@ function injectSidebar(secondary) {
         chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
     });
     
-    // Set default selection based on saved API keys
-    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        let defaultModel = 'auto';
-        if (result.SELECTED_MODEL) {
-            defaultModel = result.SELECTED_MODEL;
-        }
-        headerModelSelect.value = defaultModel;
-    });
+    // Set default selection and disable unavailable models
+    updateModelDropdown(headerModelSelect);
     
     // Create panel body (empty state before generation)
     const panelBody = document.createElement('div');
@@ -187,6 +181,49 @@ function injectSidebar(secondary) {
     
     // Insert container into secondary
     secondary.insertBefore(container, secondary.firstChild);
+}
+
+// Function to update model dropdown: disable options for missing/invalid keys, add tooltips
+function updateModelDropdown(selectEl) {
+    if (!selectEl) return;
+    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
+        const geminiOption = selectEl.querySelector('option[value="gemini"]');
+        const mistralOption = selectEl.querySelector('option[value="mistral"]');
+        const autoOption = selectEl.querySelector('option[value="auto"]');
+
+        if (geminiOption) {
+            if (!result.GEMINI_API_KEY) {
+                geminiOption.disabled = true;
+                geminiOption.title = 'No Gemini API key set — add one in settings';
+            } else {
+                geminiOption.disabled = false;
+                geminiOption.title = '';
+            }
+        }
+
+        if (mistralOption) {
+            if (!result.MISTRAL_API_KEY) {
+                mistralOption.disabled = true;
+                mistralOption.title = 'No Mistral API key set — add one in settings';
+            } else {
+                mistralOption.disabled = false;
+                mistralOption.title = '';
+            }
+        }
+
+        if (autoOption) {
+            autoOption.disabled = false;
+            autoOption.title = '';
+        }
+
+        // Resolve selected model
+        let defaultModel = result.SELECTED_MODEL || 'auto';
+        const selectedOption = selectEl.querySelector(`option[value="${defaultModel}"]`);
+        if (selectedOption && selectedOption.disabled) {
+            defaultModel = 'auto';
+        }
+        selectEl.value = defaultModel;
+    });
 }
 
 // Function to update the generate button state

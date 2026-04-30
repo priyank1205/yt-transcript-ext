@@ -216,6 +216,11 @@
   border-color: #FF0000;
 }
 
+.yt-timestamps-model-select option:disabled {
+  color: #52525b;
+  background: #1a1a1a;
+}
+
 /* Action Area Styles */
 #action-area {
   padding: 0 16px 20px;

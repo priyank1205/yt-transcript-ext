@@ -25,6 +25,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.tabs.create({ url: optionsUrl });
     return;
   }
+  if (request.action === "KEYS_CHANGED") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "KEYS_CHANGED" }).catch(() => {});
+      }
+    });
+    return;
+  }
   if (request.action === "START_GEMINI_ANALYSIS") {
     handleGeminiAnalysis(sendResponse, request.model).catch(err => {
       console.error('Unhandled error in handleGeminiAnalysis:', err);
