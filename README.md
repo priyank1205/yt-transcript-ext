@@ -31,4 +31,5 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 4. [Optional] choose a model in the panel dropdown
 
 Get a Gemini API key: https://aistudio.google.com/apikey
+
 Get a Mistral API key: https://console.mistral.ai/api-keys/
