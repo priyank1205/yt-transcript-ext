@@ -65,17 +65,14 @@ Here is the transcript: ${transcript}`;
   }
 
   async validateKey(apiKey) {
-    // Simple validation - try a test request with a small prompt
     try {
-      const testResponse = await fetch(`${CONSTANTS.API_ENDPOINTS.GEMINI}?key=${apiKey}`, {
+      const res = await fetch(`${CONSTANTS.API_ENDPOINTS.GEMINI}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: "Test prompt" }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: "." }] }] })
       });
-      return testResponse.ok;
-    } catch (err) {
+      return res.ok;
+    } catch {
       return false;
     }
   }

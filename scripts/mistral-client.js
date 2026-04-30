@@ -85,11 +85,8 @@ Here is the transcript: ${transcript}`;
   }
 
   async validateKey(apiKey) {
-    console.log(`Validating API key for model ${this.getModelName()}`);
-    // Simple validation - try a test request with a small prompt
     try {
-      console.log('Sending test request to Mistral API');
-      const testResponse = await fetch(CONSTANTS.API_ENDPOINTS.MISTRAL, {
+      const res = await fetch(CONSTANTS.API_ENDPOINTS.MISTRAL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -97,19 +94,11 @@ Here is the transcript: ${transcript}`;
         },
         body: JSON.stringify({
           model: "mistral-large-latest",
-          messages: [
-            {
-              role: "user",
-              content: "Test prompt"
-            }
-          ]
+          messages: [{ role: "user", content: "." }]
         })
       });
-      
-      console.log('Received test response:', testResponse.ok);
-      return testResponse.ok;
-    } catch (err) {
-      console.error('Error validating API key:', err);
+      return res.ok;
+    } catch {
       return false;
     }
   }

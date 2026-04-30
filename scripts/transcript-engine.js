@@ -50,47 +50,6 @@ function extractFromSegments(segments) {
     return { success: true, data: output };
 }
 
-// Function to render timestamps
-function renderTimestamps(summaryText) {
-    // Process summary text and return structured data instead of building UI
-    const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
-    const result = {
-        sections: [],
-        timestamps: []
-    };
-
-    lines.forEach(line => {
-        const cleanLine = line.replace(/```/g, '').trim();
-        if (cleanLine.startsWith('#')) {
-            result.sections.push({
-                title: cleanLine.substring(1).trim()
-            });
-            return;
-        }
-
-        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
-        if (timeMatch) {
-            const time = timeMatch[1];
-            const title = timeMatch[2];
-            const description = timeMatch[3];
-
-            let sec = 0;
-            const timeParts = time.split(':').map(Number);
-            if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-            else if (timeParts.length === 2) sec = timeParts[0] * 60 + timeParts[1];
-
-            result.timestamps.push({
-                time: time,
-                title: title,
-                description: description,
-                seconds: sec
-            });
-        }
-    });
-
-    return result;
-}
-
 // Helper function for sleep
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -102,7 +61,6 @@ if (typeof module !== 'undefined' && module.exports) {
     extractTranscript,
     findTranscriptButton,
     extractFromSegments,
-    renderTimestamps,
     sleep
   };
 }
