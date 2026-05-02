@@ -142,7 +142,7 @@ function injectSidebar(secondary) {
                         clearTimeout(timer);
                         console.log(`Response received:`, res);
                         if (chrome.runtime.lastError) {
-                            console.error(`Error:`, chrome.runtime.lastError.message);
+                            console.warn(`Error:`, chrome.runtime.lastError.message);
                             resolve({ success: false, error: chrome.runtime.lastError.message });
                         } else {
                             resolve(res || { success: false, error: 'No response from background' });
@@ -162,10 +162,10 @@ function injectSidebar(secondary) {
                     updateGenerateButton('done');
                 } else {
                     console.log(`Error: ${result?.error || 'Unknown'}`);
-                    updateGenerateButton('error', result?.error || 'Unknown error');
+                    updateGenerateButton('error', result?.error || 'Unknown error', result?.keepOpen);
                 }
             } catch (e) {
-                console.error('Extension context invalidated:', e);
+                console.warn('Extension context invalidated:', e);
                 updateGenerateButton('error', 'Extension context invalidated');
             }
         })();
@@ -228,7 +228,7 @@ function updateModelDropdown(selectEl) {
 
 // Function to update the generate button state
 let _buttonResetTimeout = null;
-function updateGenerateButton(phase, message) {
+function updateGenerateButton(phase, message, keepOpen) {
     const genBtn = document.querySelector('.yt-timestamps-generate-button');
     if (!genBtn) return;
 
@@ -241,6 +241,7 @@ function updateGenerateButton(phase, message) {
     const resetButton = () => {
         genBtn.innerHTML = 'Generate summary';
         genBtn.disabled = false;
+        genBtn.style.pointerEvents = '';
         genBtn.classList.remove('yt-error-state');
     };
 
@@ -258,8 +259,13 @@ function updateGenerateButton(phase, message) {
         case 'error':
             genBtn.classList.add('yt-error-state');
             genBtn.innerHTML = message || 'Something went wrong';
-            genBtn.disabled = false;
-            _buttonResetTimeout = setTimeout(resetButton, 3000);
+            if (keepOpen) {
+                genBtn.disabled = true;
+                genBtn.style.pointerEvents = 'none';
+            } else {
+                genBtn.disabled = false;
+                _buttonResetTimeout = setTimeout(resetButton, 3000);
+            }
             break;
         case 'done':
             resetButton();

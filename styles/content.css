@@ -391,3 +391,8 @@
   border-color: #ff4444 !important;
   color: #ff4444 !important;
 }
+
+.yt-error-state:hover {
+  background: #1e1a1a !important;
+  border-color: #ff4444 !important;
+}

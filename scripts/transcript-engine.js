@@ -12,7 +12,7 @@ async function extractTranscript() {
         transcriptBtn = findTranscriptButton();
       }
     }
-    if (!transcriptBtn) return { success: false, error: "Transcript button not found." };
+    if (!transcriptBtn) return { success: false, error: "Sorry! This video has no captions" };
     transcriptBtn.click();
     await sleep(1000);
     const panel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]');

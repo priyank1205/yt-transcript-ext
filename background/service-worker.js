@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.action === "START_GEMINI_ANALYSIS") {
     handleGeminiAnalysis(sendResponse, request.model).catch(err => {
-      console.error('Unhandled error in handleGeminiAnalysis:', err);
+      console.warn('Unhandled error in handleGeminiAnalysis:', err);
       sendResponse({ success: false, error: err.message || 'Unknown error occurred' });
     });
     return true; 
@@ -52,8 +52,8 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     console.log(`Active tab ID: ${tab?.id}`);
     
     if (!tab || !tab.id) {
-      console.error('No active tab found');
-      sendResponse({ success: false, error: 'No active tab found' });
+      console.warn('No active tab found');
+      sendResponse({ success: false, error: 'No active tab found', keepOpen: true });
       return;
     }
     
@@ -78,7 +78,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     // 4. Fetch transcript (once, reused for fallback)
     console.log('Sending PROGRESS_UPDATE: extracting');
     chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "extracting" }).catch(err => {
-      console.error('Failed to send extracting progress:', err);
+      console.warn('Failed to send extracting progress:', err);
     });
     console.log('Fetching transcript...');
     const transcriptResponse = await llmClient.fetchTranscriptWithRetry(tab.id);
@@ -86,9 +86,14 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     if (!transcriptResponse || !transcriptResponse.success) {
       const errorMsg = transcriptResponse ? transcriptResponse.error : "Could not connect to page.";
-      console.error('Failed to fetch transcript:', errorMsg);
-      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg }).catch(() => {});
-      sendResponse({ success: false, error: errorMsg });
+      const keepOpen = errorMsg.includes('no captions');
+      if (keepOpen) {
+        console.warn('Transcript:', errorMsg);
+      } else {
+        console.warn('Failed to fetch transcript:', errorMsg);
+      }
+      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg, keepOpen }).catch(() => {});
+      sendResponse({ success: false, error: errorMsg, keepOpen });
       return;
     }
     
@@ -115,7 +120,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
         }
       } else {
         const errorMsg = `API Key not found for ${resolvedModel}. Please set it in settings.`;
-        console.error(errorMsg);
+        console.warn(errorMsg);
         chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg }).catch(() => {});
         sendResponse({ success: false, error: errorMsg });
         return;
@@ -128,7 +133,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     // 6. Call the LLM API
     console.log('Sending PROGRESS_UPDATE: calling_api');
     chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api" }).catch(err => {
-      console.error('Failed to send calling_api progress:', err);
+      console.warn('Failed to send calling_api progress:', err);
     });
     console.log(`Calling ${resolvedModel} API...`);
     
@@ -136,7 +141,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     try {
       summary = await llmClient.callAPI(finalApiKey, transcriptResponse.data);
     } catch (apiErr) {
-      console.error(`API call failed for ${resolvedModel}:`, apiErr.message);
+      console.warn(`API call failed for ${resolvedModel}:`, apiErr.message);
       
       // Auto fallback: try the other model with the same transcript
       if (originalModel === 'auto') {
@@ -147,7 +152,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
         
         const fallbackKey = (await chrome.storage.local.get([`${fallbackModel.toUpperCase()}_API_KEY`]))[`${fallbackModel.toUpperCase()}_API_KEY`];
         if (!fallbackKey) {
-          console.error(`No API key for fallback model ${fallbackModel}`);
+          console.warn(`No API key for fallback model ${fallbackModel}`);
           sendResponse({ success: false, error: apiErr.message });
           return;
         }
@@ -165,14 +170,14 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     // 7. Send timestamps to content script to render
     console.log('Sending RENDER_TIMESTAMPS');
     chrome.tabs.sendMessage(tab.id, { action: "RENDER_TIMESTAMPS", data: summary }).catch(err => {
-      console.error('Failed to send RENDER_TIMESTAMPS:', err);
+      console.warn('Failed to send RENDER_TIMESTAMPS:', err);
     });
     
     // 8. Send response
     console.log('Sending success response');
     sendResponse({ success: true, data: summary, model: resolvedModel });
   } catch (err) {
-    console.error('Error in handleGeminiAnalysis:', err.message, err.stack);
+    console.warn('Error in handleGeminiAnalysis:', err.message, err.stack);
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [null]);
     if (tab) {
       chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message }).catch(() => {});

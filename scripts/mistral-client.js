@@ -15,7 +15,7 @@ class MistralClient extends LLMClient {
         console.log('Successfully fetched transcript');
         return transcriptResponse;
       } catch (err) {
-        console.error(`Error fetching transcript (attempt ${4 - retries}):`, err.message);
+        console.warn(`Error fetching transcript (attempt ${4 - retries}):`, err.message);
         if (err.message.includes("Receiving end does not exist") && retries > 1) {
           console.log('Retrying in 1 second...');
           await new Promise(r => setTimeout(r, 1000));
@@ -73,7 +73,7 @@ Here is the transcript: ${transcript}`;
       console.log('Successfully got response from Mistral');
       return result.choices[0].message.content;
     } else {
-      console.error('Failed to get valid response from Mistral:', result);
+      console.warn('Failed to get valid response from Mistral:', result);
       throw new Error("Failed to get response from Mistral.");
     }
   }
