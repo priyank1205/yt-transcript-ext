@@ -1,6 +1,6 @@
 # YouTube Transcript Extractor
 
-YouTube videos are the diamond mines of knowledge on the internet — tutorials, talks, deep dives, podcasts. But watching an hour-long video just to find one answer, or to decide if it's worth your time, is painfully inefficient.
+YouTube videos are diamond mines of knowledge on the internet — tutorials, talks, deep dives, podcasts. But watching an hour-long video just to find one answer, or to decide if it's worth your time, is painfully inefficient.
 
 This extension gives you a **timestamped, sectioned AI-generated summary** directly inside the YouTube page. Click any summary line to seek the video to that moment. No tabs, no copy-paste, no friction.
 
