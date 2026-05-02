@@ -1,5 +1,97 @@
 // scripts/ui-builder.js
 
+// Player height tracking
+let _resizeHandler = null;
+let _resizeTimer = null;
+let _lastAppliedHeight = 0;
+const ACCORDION_OFFSET = 50;
+
+function findVideoPlayer() {
+    // Try specific YouTube player selectors, fall back to the <video> element
+    const selectors = [
+        '#movie_player',
+        '#player .html5-video-container',
+        'ytd-player',
+        '.html5-video-player',
+        '#player'
+    ];
+    for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && el.getBoundingClientRect().height > 0) return el;
+    }
+    // Last resort: the <video> element itself
+    const video = document.querySelector('video');
+    if (video && video.getBoundingClientRect().height > 0) return video;
+    return null;
+}
+
+function applyPlayerHeight() {
+    const player = findVideoPlayer();
+    const panel = document.querySelector('.yt-timestamps-panel');
+    if (!panel) { console.log('[YT-Ext] no panel found'); return; }
+
+    const header = panel.querySelector('.yt-timestamps-panel-header');
+    const headerH = header ? header.offsetHeight : 45;
+
+    if (!player) {
+        console.log('[YT-Ext] no player found, using fallback');
+        const fallback = 550;
+        if (_lastAppliedHeight === fallback) return;
+        _lastAppliedHeight = fallback;
+        panel.style.maxHeight = `${fallback}px`;
+        const body = panel.querySelector('.yt-accordion-body');
+        if (body) body.style.maxHeight = '500px';
+        return;
+    }
+
+    const playerH = player.getBoundingClientRect().height;
+    console.log('[YT-Ext] playerH:', playerH, 'lastApplied:', _lastAppliedHeight);
+    if (playerH <= 0) {
+        const fallback = 550;
+        if (_lastAppliedHeight === fallback) return;
+        _lastAppliedHeight = fallback;
+        panel.style.maxHeight = `${fallback}px`;
+        const body = panel.querySelector('.yt-accordion-body');
+        if (body) body.style.maxHeight = '500px';
+        return;
+    }
+
+    const accordionMaxH = playerH + ACCORDION_OFFSET;
+    console.log('[YT-Ext] accordionMaxH:', accordionMaxH, 'vs last:', _lastAppliedHeight, 'skip:', _lastAppliedHeight === accordionMaxH);
+    if (_lastAppliedHeight === accordionMaxH) return;
+    _lastAppliedHeight = accordionMaxH;
+
+    panel.style.maxHeight = `${headerH + accordionMaxH}px`;
+    const body = panel.querySelector('.yt-accordion-body');
+    if (body) body.style.maxHeight = `${accordionMaxH}px`;
+    console.log('[YT-Ext] applied panel:', headerH + accordionMaxH, 'body:', accordionMaxH);
+}
+
+function observePlayerResize() {
+    disconnectPlayerObserver();
+    _resizeHandler = () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => {
+            const player = findVideoPlayer();
+            console.log('[YT-Ext] resize fired, player:', player?.tagName, 'height:', player?.getBoundingClientRect().height);
+            applyPlayerHeight();
+        }, 100);
+    };
+    window.addEventListener('resize', _resizeHandler);
+}
+
+function disconnectPlayerObserver() {
+    if (_resizeHandler) {
+        window.removeEventListener('resize', _resizeHandler);
+        _resizeHandler = null;
+    }
+    if (_resizeTimer) {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = null;
+    }
+    _lastAppliedHeight = 0;
+}
+
 // Function to inject sidebar into the DOM
 function injectSidebar(secondary) {
     if (document.querySelector('.yt-timestamps-container')) return;
@@ -11,25 +103,6 @@ function injectSidebar(secondary) {
     // Create panel element
     const panel = document.createElement('div');
     panel.className = 'yt-timestamps-panel';
-    
-    // Set panel height to match YouTube player height
-    const videoPlayer = document.querySelector('#player .html5-video-container') || 
-                     document.querySelector('ytd-player') || 
-                     document.querySelector('.html5-video-player');
-    
-    if (videoPlayer) {
-        // Use a more reliable method to get the player height
-        const playerHeight = videoPlayer.offsetHeight;
-        if (playerHeight > 0) {
-            panel.style.maxHeight = `${playerHeight}px`;
-        } else {
-            // Fallback to a reasonable default
-            panel.style.maxHeight = '500px';
-        }
-    } else {
-        // Fallback to a reasonable default
-        panel.style.maxHeight = '500px';
-    }
 
     // Create panel header element
     const panelHeader = document.createElement('div');
@@ -181,6 +254,12 @@ function injectSidebar(secondary) {
     
     // Insert container into secondary
     secondary.insertBefore(container, secondary.firstChild);
+
+    // Apply initial height and observe player for resizes (must be after DOM insertion)
+    applyPlayerHeight();
+    observePlayerResize();
+    // Re-apply after a short delay to catch late layout shifts
+    setTimeout(applyPlayerHeight, 500);
 }
 
 // Function to update model dropdown: disable options for missing/invalid keys, add tooltips
@@ -281,6 +360,7 @@ function renderTimestampsUI(summaryText) {
     
     // Clear existing content
     container.innerHTML = '';
+    container.classList.add('yt-has-summary');
     
     // Create panel elements
     const panel = document.createElement('div');
@@ -381,6 +461,9 @@ function renderTimestampsUI(summaryText) {
     panelContent.appendChild(timestampsList);
     panel.appendChild(panelContent);
     container.appendChild(panel);
+
+    applyPlayerHeight();
+    observePlayerResize();
     
     // Accordion toggle for the entire summary
     let isSummaryExpanded = true;

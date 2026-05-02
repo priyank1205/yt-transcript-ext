@@ -21,6 +21,9 @@ function initApp() {
 }
 
 function resetSidebar() {
+    if (typeof disconnectPlayerObserver === 'function') {
+        disconnectPlayerObserver();
+    }
     const container = document.querySelector('.yt-timestamps-container');
     if (container) container.remove();
 }
