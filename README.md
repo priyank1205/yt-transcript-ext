@@ -28,7 +28,7 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 1. Install the extension in Chrome
 2. Open the extension's settings (gear icon in the panel, or right-click the extension icon)
 3. Paste your API key for Gemini and/or Mistral
-4. [Optional] choose a model in the panel dropdown
+4. [Optional] Choose a model in the panel dropdown
 
 Get a Gemini API key: https://aistudio.google.com/apikey
 
