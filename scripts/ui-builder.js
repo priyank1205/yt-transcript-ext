@@ -462,6 +462,7 @@ function renderTimestampsUI(summaryText) {
     panel.appendChild(panelContent);
     container.appendChild(panel);
 
+    _lastAppliedHeight = 0;
     applyPlayerHeight();
     observePlayerResize();
     
