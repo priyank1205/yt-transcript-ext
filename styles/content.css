@@ -337,6 +337,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.yt-expand-btn::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  bottom: -12px;
+  left: -12px;
 }
 
 .yt-timestamps-list {
