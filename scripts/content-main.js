@@ -36,9 +36,12 @@ function handleNavigation() {
     }
     if (videoId !== currentVideoId) {
         currentVideoId = videoId;
-        resetSidebar();
-        observeDOM();
+        if (typeof clearSummaryCache === 'function') {
+            clearSummaryCache(currentVideoId);
+        }
     }
+    // Always re-inject if sidebar is missing (handles miniplayer toggle, SPA nav, etc.)
+    observeDOM();
 }
 
 // Function to update the current model

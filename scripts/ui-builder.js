@@ -6,6 +6,29 @@ let _resizeTimer = null;
 let _lastAppliedHeight = 0;
 const ACCORDION_OFFSET = 50;
 
+// Summary cache: stores generated summaries keyed by video ID
+const _summaryCache = {};
+
+function getCurrentVideoId() {
+    return new URLSearchParams(window.location.search).get('v');
+}
+
+function cacheSummary(videoId, summaryText) {
+    if (videoId && summaryText) {
+        _summaryCache[videoId] = summaryText;
+    }
+}
+
+function getCachedSummary(videoId) {
+    return videoId ? _summaryCache[videoId] : null;
+}
+
+function clearSummaryCache(videoId) {
+    if (videoId) {
+        delete _summaryCache[videoId];
+    }
+}
+
 function findVideoPlayer() {
     // Try specific YouTube player selectors, fall back to the <video> element
     const selectors = [
@@ -260,6 +283,12 @@ function injectSidebar(secondary) {
     observePlayerResize();
     // Re-apply after a short delay to catch late layout shifts
     setTimeout(applyPlayerHeight, 500);
+
+    // Restore cached summary if available (e.g. after miniplayer toggle)
+    const cachedSummary = getCachedSummary(getCurrentVideoId());
+    if (cachedSummary) {
+        renderTimestampsUI(cachedSummary);
+    }
 }
 
 // Function to update model dropdown: disable options for missing/invalid keys, add tooltips
@@ -354,6 +383,9 @@ function updateGenerateButton(phase, message, keepOpen) {
 
 // Function to render timestamps UI from processed data
 function renderTimestampsUI(summaryText) {
+    // Cache the summary for restoration across DOM rebuilds (e.g. miniplayer toggle)
+    cacheSummary(getCurrentVideoId(), summaryText);
+
     // This function will build the UI for timestamps
     const container = document.querySelector('.yt-timestamps-container');
     if (!container) return;
