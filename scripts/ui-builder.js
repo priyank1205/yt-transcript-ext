@@ -9,6 +9,10 @@ const ACCORDION_OFFSET = 50;
 // Summary cache: stores generated summaries keyed by video ID
 const _summaryCache = {};
 
+// Track the currently expanded timestamp accordion
+let _expandedAccordion = null;
+let _expandedAccordionBtn = null;
+
 function getCurrentVideoId() {
     return new URLSearchParams(window.location.search).get('v');
 }
@@ -394,6 +398,10 @@ function renderTimestampsUI(summaryText) {
     container.innerHTML = '';
     container.classList.add('yt-has-summary');
     
+    // Reset expanded accordion tracking
+    _expandedAccordion = null;
+    _expandedAccordionBtn = null;
+    
     // Create panel elements
     const panel = document.createElement('div');
     panel.className = 'yt-timestamps-panel';
@@ -469,12 +477,44 @@ function renderTimestampsUI(summaryText) {
             let isExpanded = false;
             expandBtn.onclick = e => {
                 e.stopPropagation();
+                
+                const scrollContainer = panelContent;
+                
+                // Close the currently expanded accordion instantly (no transition)
+                if (_expandedAccordion && _expandedAccordion !== accordionContent) {
+                    const oldAccordion = _expandedAccordion;
+                    
+                    // Capture position before instant collapse
+                    const yBefore = tsDiv.getBoundingClientRect().top;
+                    
+                    // Disable transition, collapse, force reflow
+                    oldAccordion.style.setProperty('transition', 'none', 'important');
+                    oldAccordion.classList.remove('expanded');
+                    oldAccordion.offsetHeight; // force reflow
+                    
+                    // Re-enable transition
+                    oldAccordion.style.removeProperty('transition');
+                    
+                    // Correct scroll to keep tsDiv visually anchored
+                    const yAfter = tsDiv.getBoundingClientRect().top;
+                    scrollContainer.scrollTop += (yAfter - yBefore);
+                    
+                    if (_expandedAccordionBtn) {
+                        _expandedAccordionBtn.textContent = '+';
+                    }
+                }
+                
                 isExpanded = !isExpanded;
                 expandBtn.textContent = isExpanded ? '−' : '+';
+                
                 if (isExpanded) {
                     accordionContent.classList.add('expanded');
+                    _expandedAccordion = accordionContent;
+                    _expandedAccordionBtn = expandBtn;
                 } else {
                     accordionContent.classList.remove('expanded');
+                    _expandedAccordion = null;
+                    _expandedAccordionBtn = null;
                 }
             };
             
