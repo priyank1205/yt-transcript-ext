@@ -54,11 +54,17 @@ initApp();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "GET_TRANSCRIPT") {
-        extractTranscript().then(sendResponse);
+        extractTranscript()
+            .then(result => sendResponse(result))
+            .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
     } else if (request.action === "RENDER_TIMESTAMPS") {
-        renderTimestampsUI(request.data);
-        sendResponse({ success: true });
+        try {
+            renderTimestampsUI(request.data);
+            sendResponse({ success: true });
+        } catch (err) {
+            sendResponse({ success: false, error: err.message });
+        }
         return true;
     } else if (request.action === "PROGRESS_UPDATE") {
         if (typeof updateGenerateButton === 'function') {
