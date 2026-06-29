@@ -4,6 +4,15 @@
 import { GeminiClient } from '../scripts/gemini-client.js';
 import { MistralClient } from '../scripts/mistral-client.js';
 
+// Helper: send a message to a tab and await it to prevent the service worker from terminating prematurely
+async function sendTabMessage(tabId, message) {
+  try {
+    await chrome.tabs.sendMessage(tabId, message);
+  } catch (err) {
+    // Silently ignore errors (e.g., content script not ready or tab closed)
+  }
+}
+
 // Helper: get the other model for fallback
 function getOtherModel(model) {
   return model === 'gemini' ? 'mistral' : 'gemini';
@@ -28,7 +37,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "KEYS_CHANGED") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "KEYS_CHANGED" }).catch(() => {});
+        sendTabMessage(tabs[0].id, { action: "KEYS_CHANGED" });
       }
     });
     return;
@@ -79,9 +88,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     // 4. Fetch transcript (once, reused for fallback)
     console.log('Sending PROGRESS_UPDATE: extracting');
-    chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "extracting" }).catch(err => {
-      console.warn('Failed to send extracting progress:', err);
-    });
+    await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "extracting" });
     console.log('Fetching transcript...');
     const transcriptResponse = await llmClient.fetchTranscriptWithRetry(tab.id);
     console.log('Transcript fetched successfully:', transcriptResponse?.success);
@@ -94,7 +101,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
       } else {
         console.warn('Failed to fetch transcript:', errorMsg);
       }
-      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg, keepOpen }).catch(() => {});
+      await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg, keepOpen });
       sendResponse({ success: false, error: errorMsg, keepOpen });
       return;
     }
@@ -114,14 +121,14 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
           llmClient = getClient(resolvedModel);
         } else {
           const errorMsg = `No API key found. Please set one in settings.`;
-          chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg }).catch(() => {});
+          await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
           sendResponse({ success: false, error: errorMsg });
           return;
         }
       } else {
         const errorMsg = `API Key not found for ${resolvedModel}. Please set it in settings.`;
         console.warn(errorMsg);
-        chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg }).catch(() => {});
+        await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
         sendResponse({ success: false, error: errorMsg });
         return;
       }
@@ -132,9 +139,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     // 6. Call the LLM API
     console.log('Sending PROGRESS_UPDATE: calling_api');
-    chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api" }).catch(err => {
-      console.warn('Failed to send calling_api progress:', err);
-    });
+    await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api" });
     console.log(`Calling ${resolvedModel} API...`);
     
     let summary;
@@ -148,7 +153,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
         const fallbackModel = getOtherModel(resolvedModel);
         console.log(`${resolvedModel} failed, trying ${fallbackModel}...`);
         
-        chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api", message: `Trying ${fallbackModel}...` }).catch(() => {});
+        await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api", message: `Trying ${fallbackModel}...` });
         
         const fallbackKey = storage[`${fallbackModel.toUpperCase()}_API_KEY`];
         if (!fallbackKey) {
@@ -169,9 +174,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     // 7. Send timestamps to content script to render
     console.log('Sending RENDER_TIMESTAMPS');
-    chrome.tabs.sendMessage(tab.id, { action: "RENDER_TIMESTAMPS", data: summary }).catch(err => {
-      console.warn('Failed to send RENDER_TIMESTAMPS:', err);
-    });
+    await sendTabMessage(tab.id, { action: "RENDER_TIMESTAMPS", data: summary });
     
     // 8. Send response
     console.log('Sending success response');
@@ -180,7 +183,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     console.warn('Error in handleGeminiAnalysis:', err.message, err.stack);
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [null]);
     if (tab) {
-      chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message }).catch(() => {});
+      await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message });
     }
     sendResponse({ success: false, error: err.message });
   }
