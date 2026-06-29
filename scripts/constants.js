@@ -5,10 +5,16 @@ const CONSTANTS = {
   YOUTUBE_SELECTORS: {
     SECONDARY: 'ytd-watch-flexy #secondary',
     TRANSCRIPT_BUTTON: 'button, ytd-button-renderer',
-    TRANSCRIPT_PANEL: 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
-    TRANSCRIPT_SEGMENT: 'ytd-transcript-segment-renderer',
-    TIMESTAMP: '.segment-timestamp, #timestamp',
-    CONTENT: '.segment-text, #content'
+    // Old UI selectors (legacy transcript panel)
+    TRANSCRIPT_PANEL_OLD: 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
+    TRANSCRIPT_SEGMENT_OLD: 'ytd-transcript-segment-renderer',
+    TIMESTAMP_OLD: '.segment-timestamp, #timestamp',
+    CONTENT_OLD: '.segment-text, #content',
+    // New UI selectors (modern transcript panel)
+    TRANSCRIPT_PANEL_NEW: 'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"]',
+    TRANSCRIPT_SEGMENT_NEW: 'transcript-segment-view-model',
+    TIMESTAMP_NEW: '.ytwTranscriptSegmentViewModelTimestamp',
+    CONTENT_NEW: 'span[role="text"]'
   },
   API_ENDPOINTS: {
     GEMINI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent',

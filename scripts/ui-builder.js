@@ -55,13 +55,12 @@ function findVideoPlayer() {
 function applyPlayerHeight() {
     const player = findVideoPlayer();
     const panel = document.querySelector('.yt-timestamps-panel');
-    if (!panel) { console.log('[YT-Ext] no panel found'); return; }
+    if (!panel) return;
 
     const header = panel.querySelector('.yt-timestamps-panel-header');
     const headerH = header ? header.offsetHeight : 45;
 
     if (!player) {
-        console.log('[YT-Ext] no player found, using fallback');
         const fallback = 550;
         if (_lastAppliedHeight === fallback) return;
         _lastAppliedHeight = fallback;
@@ -72,7 +71,6 @@ function applyPlayerHeight() {
     }
 
     const playerH = player.getBoundingClientRect().height;
-    console.log('[YT-Ext] playerH:', playerH, 'lastApplied:', _lastAppliedHeight);
     if (playerH <= 0) {
         const fallback = 550;
         if (_lastAppliedHeight === fallback) return;
@@ -84,14 +82,12 @@ function applyPlayerHeight() {
     }
 
     const accordionMaxH = playerH + ACCORDION_OFFSET;
-    console.log('[YT-Ext] accordionMaxH:', accordionMaxH, 'vs last:', _lastAppliedHeight, 'skip:', _lastAppliedHeight === accordionMaxH);
     if (_lastAppliedHeight === accordionMaxH) return;
     _lastAppliedHeight = accordionMaxH;
 
     panel.style.maxHeight = `${headerH + accordionMaxH}px`;
     const body = panel.querySelector('.yt-accordion-body');
     if (body) body.style.maxHeight = `${accordionMaxH}px`;
-    console.log('[YT-Ext] applied panel:', headerH + accordionMaxH, 'body:', accordionMaxH);
 }
 
 function observePlayerResize() {
@@ -100,7 +96,6 @@ function observePlayerResize() {
         clearTimeout(_resizeTimer);
         _resizeTimer = setTimeout(() => {
             const player = findVideoPlayer();
-            console.log('[YT-Ext] resize fired, player:', player?.tagName, 'height:', player?.getBoundingClientRect().height);
             applyPlayerHeight();
         }, 100);
     };
@@ -216,7 +211,6 @@ function injectSidebar(secondary) {
     genBtn.textContent = 'Generate summary';
     genBtn.className = 'yt-timestamps-generate-button';
     genBtn.onclick = () => {
-        console.log('Generate button clicked');
         updateGenerateButton('extracting');
         
         const headerModelSelect = document.getElementById('header-model-select');
@@ -225,12 +219,10 @@ function injectSidebar(secondary) {
         // Send analysis request with timeout
         const sendAnalysis = (model, timeout = 120000) => {
             return new Promise((resolve) => {
-                console.log(`Prompt sent to ${model}`);
                 let resolved = false;
                 
                 const timer = setTimeout(() => {
                     if (!resolved) {
-                        console.log(`Request to ${model} timed out`);
                         resolved = true;
                         resolve({ success: false, error: `Request timed out` });
                     }
@@ -240,13 +232,13 @@ function injectSidebar(secondary) {
                     if (!resolved) {
                         resolved = true;
                         clearTimeout(timer);
-                        console.log(`Response received:`, res);
                         if (chrome.runtime.lastError) {
-                            console.warn(`Error:`, chrome.runtime.lastError.message);
                             resolve({ success: false, error: chrome.runtime.lastError.message });
                         } else {
                             resolve(res || { success: false, error: 'No response from background' });
                         }
+                    } else {
+                        resolve({ success: false, error: 'No response from background' });
                     }
                 });
             });
@@ -258,14 +250,11 @@ function injectSidebar(secondary) {
                 const result = await sendAnalysis(selectedModel);
                 
                 if (result && result.success) {
-                    console.log(`Summary received via ${result.model || selectedModel}`);
                     updateGenerateButton('done');
                 } else {
-                    console.log(`Error: ${result?.error || 'Unknown'}`);
                     updateGenerateButton('error', result?.error || 'Unknown error', result?.keepOpen);
                 }
             } catch (e) {
-                console.warn('Extension context invalidated:', e);
                 updateGenerateButton('error', 'Extension context invalidated');
             }
         })();
