@@ -6,24 +6,6 @@ import { LLMClient } from './llm-client.js';
 import CONSTANTS from './constants.js';
 
 class GeminiClient extends LLMClient {
-  // Function to fetch transcript from content script with retry
-  async fetchTranscriptWithRetry(tabId, retries = 3) {
-    while (retries > 0) {
-      try {
-        const transcriptResponse = await chrome.tabs.sendMessage(tabId, { action: "GET_TRANSCRIPT" });
-        return transcriptResponse;
-      } catch (err) {
-        if (err.message.includes("Receiving end does not exist") && retries > 1) {
-          await new Promise(r => setTimeout(r, 1000));
-          retries--;
-        } else {
-          throw err;
-        }
-      }
-    }
-    throw new Error("Failed to fetch transcript after retries");
-  }
-
   // Function to call Gemini API
   async callGeminiAPI(apiKey, transcript) {
     const prompt = `${CONSTANTS.PROMPTS.SUMMARY_PROMPT}
