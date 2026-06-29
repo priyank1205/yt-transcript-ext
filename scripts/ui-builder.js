@@ -13,6 +13,31 @@ const _summaryCache = {};
 let _expandedAccordion = null;
 let _expandedAccordionBtn = null;
 
+// Cached DOM references for performance (invalidated when panel rebuilds)
+let _cachedPanel = null;
+let _cachedPanelBody = null;
+
+function _getPanel() {
+    if (_cachedPanel && document.contains(_cachedPanel)) {
+        return _cachedPanel;
+    }
+    _cachedPanel = document.querySelector('.yt-timestamps-panel');
+    return _cachedPanel;
+}
+
+function _getPanelBody() {
+    if (_cachedPanelBody && document.contains(_cachedPanelBody)) {
+        return _cachedPanelBody;
+    }
+    _cachedPanelBody = document.querySelector('.yt-accordion-body');
+    return _cachedPanelBody;
+}
+
+function _invalidateCache() {
+    _cachedPanel = null;
+    _cachedPanelBody = null;
+}
+
 function getCurrentVideoId() {
     return new URLSearchParams(window.location.search).get('v');
 }
@@ -54,7 +79,7 @@ function findVideoPlayer() {
 
 function applyPlayerHeight() {
     const player = findVideoPlayer();
-    const panel = document.querySelector('.yt-timestamps-panel');
+    const panel = _getPanel();
     if (!panel) return;
 
     const header = panel.querySelector('.yt-timestamps-panel-header');
@@ -65,7 +90,7 @@ function applyPlayerHeight() {
         if (_lastAppliedHeight === fallback) return;
         _lastAppliedHeight = fallback;
         panel.style.maxHeight = `${fallback}px`;
-        const body = panel.querySelector('.yt-accordion-body');
+        const body = _getPanelBody();
         if (body) body.style.maxHeight = '500px';
         return;
     }
@@ -76,7 +101,7 @@ function applyPlayerHeight() {
         if (_lastAppliedHeight === fallback) return;
         _lastAppliedHeight = fallback;
         panel.style.maxHeight = `${fallback}px`;
-        const body = panel.querySelector('.yt-accordion-body');
+        const body = _getPanelBody();
         if (body) body.style.maxHeight = '500px';
         return;
     }
@@ -86,7 +111,7 @@ function applyPlayerHeight() {
     _lastAppliedHeight = accordionMaxH;
 
     panel.style.maxHeight = `${headerH + accordionMaxH}px`;
-    const body = panel.querySelector('.yt-accordion-body');
+    const body = _getPanelBody();
     if (body) body.style.maxHeight = `${accordionMaxH}px`;
 }
 
@@ -383,8 +408,9 @@ function renderTimestampsUI(summaryText) {
     const container = document.querySelector('.yt-timestamps-container');
     if (!container) return;
     
-    // Clear existing content
+    // Clear existing content and invalidate cached DOM references
     container.innerHTML = '';
+    _invalidateCache();
     container.classList.add('yt-has-summary');
     
     // Reset expanded accordion tracking

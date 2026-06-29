@@ -26,6 +26,9 @@ function resetSidebar() {
     }
     const container = document.querySelector('.yt-timestamps-container');
     if (container) container.remove();
+    if (typeof _invalidateCache === 'function') {
+        _invalidateCache();
+    }
 }
 
 function handleNavigation() {
