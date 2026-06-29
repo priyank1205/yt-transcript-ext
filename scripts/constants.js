@@ -2,19 +2,20 @@
 
 // Shared selectors and config
 const CONSTANTS = {
-  YOUTUBE_SELECTORS: {
-    SECONDARY: 'ytd-watch-flexy #secondary',
-    TRANSCRIPT_BUTTON: 'button, ytd-button-renderer',
-    // Old UI selectors (legacy transcript panel)
-    TRANSCRIPT_PANEL_OLD: 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
-    TRANSCRIPT_SEGMENT_OLD: 'ytd-transcript-segment-renderer',
-    TIMESTAMP_OLD: '.segment-timestamp, #timestamp',
-    CONTENT_OLD: '.segment-text, #content',
-    // New UI selectors (modern transcript panel)
-    TRANSCRIPT_PANEL_NEW: 'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"]',
-    TRANSCRIPT_SEGMENT_NEW: 'transcript-segment-view-model',
-    TIMESTAMP_NEW: '.ytwTranscriptSegmentViewModelTimestamp',
-    CONTENT_NEW: 'span[role="text"]'
+  TRANSCRIPT: {
+    PANEL_SELECTOR: 'ytd-engagement-panel-section-list-renderer',
+    SELECTORS: {
+      OLD: {
+        segment: 'ytd-transcript-segment-renderer',
+        timestamp: '.segment-timestamp, #timestamp',
+        content: '.segment-text, #content'
+      },
+      NEW: {
+        segment: 'transcript-segment-view-model',
+        timestamp: '.ytwTranscriptSegmentViewModelTimestamp',
+        content: 'span[role="text"]'
+      }
+    }
   },
   API_ENDPOINTS: {
     GEMINI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent',
