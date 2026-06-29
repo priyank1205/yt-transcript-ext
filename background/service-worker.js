@@ -57,10 +57,12 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
       return;
     }
     
+    // Fetch all storage keys once upfront
+    const storage = await chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY']);
+    
     // 2. Resolve 'auto' to actual model
     let resolvedModel = modelName;
     if (modelName === 'auto') {
-      const storage = await chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY']);
       if (storage.GEMINI_API_KEY) {
         resolvedModel = 'gemini';
       } else if (storage.MISTRAL_API_KEY) {
@@ -98,16 +100,14 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     }
     
     // 5. Get API key for resolved model
-    const storageKey = `${resolvedModel.toUpperCase()}_API_KEY`;
+    const apiKey = storage[`${resolvedModel.toUpperCase()}_API_KEY`];
     console.log(`Getting API key for model: ${resolvedModel}`);
-    const keyStorage = await chrome.storage.local.get([storageKey]);
-    const apiKey = keyStorage[storageKey];
     
     if (!apiKey) {
       // If auto mode, try the other model's key
       if (originalModel === 'auto') {
         const fallbackModel = getOtherModel(resolvedModel);
-        const fallbackKey = (await chrome.storage.local.get([`${fallbackModel.toUpperCase()}_API_KEY`]))[`${fallbackModel.toUpperCase()}_API_KEY`];
+        const fallbackKey = storage[`${fallbackModel.toUpperCase()}_API_KEY`];
         if (fallbackKey) {
           console.log(`No key for ${resolvedModel}, but ${fallbackModel} has a key. Switching.`);
           resolvedModel = fallbackModel;
@@ -127,7 +127,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
       }
     }
     
-    const finalApiKey = (await chrome.storage.local.get([`${resolvedModel.toUpperCase()}_API_KEY`]))[`${resolvedModel.toUpperCase()}_API_KEY`];
+    const finalApiKey = apiKey || storage[`${resolvedModel.toUpperCase()}_API_KEY`];
     console.log(`API Key found for ${resolvedModel}, length: ${finalApiKey?.length}`);
     
     // 6. Call the LLM API
@@ -150,7 +150,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
         
         chrome.tabs.sendMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api", message: `Trying ${fallbackModel}...` }).catch(() => {});
         
-        const fallbackKey = (await chrome.storage.local.get([`${fallbackModel.toUpperCase()}_API_KEY`]))[`${fallbackModel.toUpperCase()}_API_KEY`];
+        const fallbackKey = storage[`${fallbackModel.toUpperCase()}_API_KEY`];
         if (!fallbackKey) {
           console.warn(`No API key for fallback model ${fallbackModel}`);
           sendResponse({ success: false, error: apiErr.message });
