@@ -6,35 +6,77 @@ import { MistralClient } from '../scripts/mistral-client.js';
 const geminiClient = new GeminiClient();
 const mistralClient = new MistralClient();
 
+// Reusable button-content markup
+const SAVE_ICON = '<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>';
+const SPINNER = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;animation:spin 0.6s linear infinite"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>';
+const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
+
+// Banner icon paths
+const INFO_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z';
+const CHECK_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
+
 document.addEventListener('DOMContentLoaded', () => {
-  const geminiInput = document.getElementById('gemini-api-key');
-  const mistralInput = document.getElementById('mistral-api-key');
-  const saveGeminiBtn = document.getElementById('save-gemini-key');
-  const saveMistralBtn = document.getElementById('save-mistral-key');
-  const geminiStatus = document.getElementById('gemini-status');
-  const mistralStatus = document.getElementById('mistral-status');
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
+  const banner = document.getElementById('intro-banner');
+  const bannerIcon = document.getElementById('banner-icon');
+  const bannerText = document.getElementById('intro-banner-text');
 
-  // Load saved keys
+  // Per-provider element + config map
+  const providers = {
+    gemini: {
+      name: 'gemini',
+      label: 'Gemini',
+      storageKey: 'GEMINI_API_KEY',
+      client: geminiClient,
+      input: document.getElementById('gemini-api-key'),
+      saveBtn: document.getElementById('save-gemini-key'),
+      removeBtn: document.getElementById('remove-gemini-key'),
+      status: document.getElementById('gemini-status'),
+      hint: document.getElementById('gemini-key-hint'),
+      helpToggle: document.getElementById('gemini-help-toggle'),
+      helpBody: document.getElementById('gemini-help'),
+    },
+    mistral: {
+      name: 'mistral',
+      label: 'Mistral',
+      storageKey: 'MISTRAL_API_KEY',
+      client: mistralClient,
+      input: document.getElementById('mistral-api-key'),
+      saveBtn: document.getElementById('save-mistral-key'),
+      removeBtn: document.getElementById('remove-mistral-key'),
+      status: document.getElementById('mistral-status'),
+      hint: document.getElementById('mistral-key-hint'),
+      helpToggle: document.getElementById('mistral-help-toggle'),
+      helpBody: document.getElementById('mistral-help'),
+    },
+  };
+
+  const configured = { gemini: false, mistral: false };
+
+  // Load saved keys and paint each card's state
   chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY'], (result) => {
-    if (result.GEMINI_API_KEY) {
-      geminiInput.value = result.GEMINI_API_KEY;
-      geminiInput.classList.add('secured');
-      updateStatus(geminiStatus, true);
-    }
-    if (result.MISTRAL_API_KEY) {
-      mistralInput.value = result.MISTRAL_API_KEY;
-      mistralInput.classList.add('secured');
-      updateStatus(mistralStatus, true);
-    }
+    configured.gemini = !!result.GEMINI_API_KEY;
+    configured.mistral = !!result.MISTRAL_API_KEY;
+    applyKeyState(providers.gemini, result.GEMINI_API_KEY || null);
+    applyKeyState(providers.mistral, result.MISTRAL_API_KEY || null);
+    updateBanner();
+  });
+
+  // Wire up each provider
+  Object.values(providers).forEach((p) => {
+    p.saveBtn.addEventListener('click', () => handleSave(p));
+    p.removeBtn.addEventListener('click', () => handleRemove(p));
+    p.helpToggle.addEventListener('click', () => {
+      const open = p.helpToggle.getAttribute('aria-expanded') === 'true';
+      setAccordion(p, !open);
+    });
   });
 
   // Toggle password visibility
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const targetId = btn.getAttribute('data-target');
-      const input = document.getElementById(targetId);
+      const input = document.getElementById(btn.getAttribute('data-target'));
       const eyeOpen = btn.querySelector('.eye-open');
       const eyeClosed = btn.querySelector('.eye-closed');
 
@@ -52,96 +94,117 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Save Gemini key
-  saveGeminiBtn.addEventListener('click', async () => {
-    const key = geminiInput.value.trim();
+  // --- Save flow (validate live, then persist) ---
+  async function handleSave(p) {
+    const key = p.input.value.trim();
     if (!key) {
-      geminiInput.focus();
-      geminiInput.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-      setTimeout(() => { geminiInput.style.borderColor = ''; }, 1500);
+      p.input.focus();
+      flashInvalid(p.input);
       return;
     }
-    saveGeminiBtn.disabled = true;
-    saveGeminiBtn.querySelector('.btn-content').innerHTML = `
-      <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;animation:spin 0.6s linear infinite"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>
-      Validating...
-    `;
-    const valid = await geminiClient.validateKey(key);
-    if (!valid) {
-      saveGeminiBtn.disabled = false;
-      saveGeminiBtn.querySelector('.btn-content').innerHTML = `
-        <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-        Save
-      `;
-      updateStatus(geminiStatus, 'invalid');
-      showToast('Invalid API key');
-      geminiInput.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-      setTimeout(() => { geminiInput.style.borderColor = ''; }, 1500);
-      return;
-    }
-    saveKey(saveGeminiBtn, { GEMINI_API_KEY: key }, () => {
-      updateStatus(geminiStatus, true);
-      showToast('Gemini key saved');
-      chrome.runtime.sendMessage({ action: "KEYS_CHANGED" });
-    });
-  });
 
-  // Save Mistral key
-  saveMistralBtn.addEventListener('click', async () => {
-    const key = mistralInput.value.trim();
-    if (!key) {
-      mistralInput.focus();
-      mistralInput.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-      setTimeout(() => { mistralInput.style.borderColor = ''; }, 1500);
-      return;
-    }
-    saveMistralBtn.disabled = true;
-    saveMistralBtn.querySelector('.btn-content').innerHTML = `
-      <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;animation:spin 0.6s linear infinite"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>
-      Validating...
-    `;
-    const valid = await mistralClient.validateKey(key);
-    if (!valid) {
-      saveMistralBtn.disabled = false;
-      saveMistralBtn.querySelector('.btn-content').innerHTML = `
-        <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-        Save
-      `;
-      updateStatus(mistralStatus, 'invalid');
-      showToast('Invalid API key');
-      mistralInput.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-      setTimeout(() => { mistralInput.style.borderColor = ''; }, 1500);
-      return;
-    }
-    saveKey(saveMistralBtn, { MISTRAL_API_KEY: key }, () => {
-      updateStatus(mistralStatus, true);
-      showToast('Mistral key saved');
-      chrome.runtime.sendMessage({ action: "KEYS_CHANGED" });
-    });
-  });
+    p.saveBtn.disabled = true;
+    setBtn(p.saveBtn, SPINNER, 'Validating...');
 
-  function saveKey(btn, data, callback) {
-    btn.classList.add('saving');
-    btn.querySelector('.btn-content').innerHTML = `
-      <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;animation:spin 0.6s linear infinite"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7z"/></svg>
-      Saving...
-    `;
-    chrome.storage.local.set(data, () => {
+    const valid = await p.client.validateKey(key);
+    if (!valid) {
+      p.saveBtn.disabled = false;
+      setBtn(p.saveBtn, SAVE_ICON, 'Save');
+      updateStatus(p.status, 'invalid');
+      showToast('Invalid API key');
+      flashInvalid(p.input);
+      return;
+    }
+
+    p.saveBtn.classList.add('saving');
+    setBtn(p.saveBtn, SPINNER, 'Saving...');
+    chrome.storage.local.set({ [p.storageKey]: key }, () => {
       setTimeout(() => {
-        btn.classList.remove('saving');
-        btn.querySelector('.btn-content').innerHTML = `
-          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
-          Saved
-        `;
+        p.saveBtn.classList.remove('saving');
+        setBtn(p.saveBtn, CHECK_ICON, 'Saved');
         setTimeout(() => {
-          btn.querySelector('.btn-content').innerHTML = `
-            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-            Save
-          `;
-          if (callback) callback();
+          p.saveBtn.disabled = false;
+          setBtn(p.saveBtn, SAVE_ICON, 'Save');
         }, 1500);
+
+        configured[p.name] = true;
+        applyKeyState(p, key);
+        updateBanner();
+        showToast(`${p.label} key saved`);
+        chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
       }, 400);
     });
+  }
+
+  // --- Remove flow ---
+  function handleRemove(p) {
+    chrome.storage.local.remove(p.storageKey, () => {
+      configured[p.name] = false;
+      resetVisibility(p.input);
+      applyKeyState(p, null);
+      updateBanner();
+      showToast(`${p.label} key removed`);
+      chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
+    });
+  }
+
+  // Paint a card for the given key (null = not configured)
+  function applyKeyState(p, key) {
+    if (key) {
+      p.input.value = key;
+      p.input.classList.add('secured');
+      updateStatus(p.status, true);
+      p.hint.textContent = `Saved ••••••••${String(key).slice(-4)}`;
+      p.hint.hidden = false;
+      p.removeBtn.hidden = false;
+      setAccordion(p, false);
+    } else {
+      p.input.value = '';
+      p.input.classList.remove('secured');
+      updateStatus(p.status, false);
+      p.hint.hidden = true;
+      p.removeBtn.hidden = true;
+      setAccordion(p, true);
+    }
+  }
+
+  function setAccordion(p, open) {
+    p.helpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    p.helpBody.classList.toggle('open', open);
+  }
+
+  function updateBanner() {
+    const g = configured.gemini;
+    const m = configured.mistral;
+    const ready = g || m;
+    banner.classList.toggle('ready', ready);
+    bannerIcon.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ready ? CHECK_PATH : INFO_PATH}"/></svg>`;
+    if (g && m) {
+      bannerText.innerHTML = '<strong>Both providers configured.</strong> Auto mode uses Gemini first and falls back to Mistral.';
+    } else if (ready) {
+      bannerText.innerHTML = "<strong>You're all set.</strong> Add the other provider too for automatic fallback.";
+    } else {
+      bannerText.innerHTML = 'Add an API key from <strong>either provider</strong> below to start generating summaries — both offer a free tier.';
+    }
+  }
+
+  function setBtn(btn, icon, label) {
+    btn.querySelector('.btn-content').innerHTML = `${icon}\n${label}`;
+  }
+
+  function flashInvalid(input) {
+    input.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+    setTimeout(() => { input.style.borderColor = ''; }, 1500);
+  }
+
+  function resetVisibility(input) {
+    input.type = 'password';
+    const btn = document.querySelector(`.toggle-visibility[data-target="${input.id}"]`);
+    if (!btn) return;
+    const eyeOpen = btn.querySelector('.eye-open');
+    const eyeClosed = btn.querySelector('.eye-closed');
+    if (eyeOpen) eyeOpen.style.display = 'block';
+    if (eyeClosed) eyeClosed.style.display = 'none';
   }
 
   function updateStatus(badge, state) {

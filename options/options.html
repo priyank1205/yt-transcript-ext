@@ -393,6 +393,272 @@
       height: 14px;
       fill: #4ade80;
     }
+
+    /* Intro banner */
+    .info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      transition: border-color 0.3s ease;
+      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+    }
+
+    .info-banner.ready {
+      border-color: rgba(34, 197, 94, 0.2);
+      background: rgba(34, 197, 94, 0.04);
+    }
+
+    .banner-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .banner-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: #71717a;
+    }
+
+    .info-banner.ready .banner-icon svg { fill: #4ade80; }
+
+    .info-banner p {
+      font-size: 12.5px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    .info-banner p strong { color: #fafafa; font-weight: 600; }
+
+    /* Action row: Save + Remove */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .action-row .save-btn { flex: 1; }
+
+    .remove-btn {
+      padding: 9px 14px;
+      background: transparent;
+      color: #71717a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .remove-btn:hover {
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.3);
+      background: rgba(239, 68, 68, 0.06);
+    }
+
+    .remove-btn[hidden] { display: none; }
+
+    /* Saved-key hint */
+    .key-hint {
+      font-size: 11px;
+      color: #71717a;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      letter-spacing: 0.04em;
+      margin: -2px 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .key-hint::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+      flex-shrink: 0;
+    }
+
+    .key-hint[hidden] { display: none; }
+
+    /* Help accordion */
+    .help {
+      margin-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 12px;
+    }
+
+    .help-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: none;
+      padding: 2px 0;
+      cursor: pointer;
+      color: #a1a1aa;
+      font-size: 12.5px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: color 0.2s ease;
+    }
+
+    .help-toggle:hover { color: #fafafa; }
+
+    .help-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex: 1;
+      text-align: left;
+    }
+
+    .help-toggle-label svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+      opacity: 0.7;
+      flex-shrink: 0;
+    }
+
+    .help-chevron {
+      width: 16px;
+      height: 16px;
+      fill: #52525b;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+    }
+
+    .help-toggle[aria-expanded="true"] .help-chevron { transform: rotate(90deg); }
+
+    .free-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      padding: 2px 7px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+
+    .help-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .help-body.open { grid-template-rows: 1fr; }
+
+    .help-body-inner {
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .help-steps {
+      list-style: none;
+      counter-reset: step;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+
+    .help-steps li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 26px;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    .help-steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #d4d4d8;
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .help-steps li strong { color: #fafafa; font-weight: 600; }
+
+    .help-note {
+      font-size: 11.5px;
+      color: #71717a;
+      margin: 2px 0 12px;
+      padding-left: 26px;
+      line-height: 1.45;
+    }
+
+    .get-key-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #fafafa;
+      font-size: 12.5px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .get-key-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .get-key-btn svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+    }
+
+    /* Privacy note */
+    .privacy-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #52525b;
+      margin: 2px 0 12px;
+      line-height: 1.4;
+      text-align: center;
+      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
+    }
+
+    .privacy-note svg {
+      width: 12px;
+      height: 12px;
+      fill: #52525b;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -403,6 +669,13 @@
       </div>
       <h1>Transcript Extractor</h1>
       <p>Configure your AI model API keys</p>
+    </div>
+
+    <div class="info-banner" id="intro-banner">
+      <span class="banner-icon" id="banner-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      </span>
+      <p id="intro-banner-text">Add an API key from <strong>either provider</strong> below to start generating summaries — both offer a free tier.</p>
     </div>
 
     <div class="cards">
@@ -428,12 +701,41 @@
             </button>
           </div>
         </div>
-        <button class="save-btn" id="save-gemini-key">
-          <span class="btn-content">
-            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-            Save
-          </span>
-        </button>
+        <div class="key-hint" id="gemini-key-hint" hidden></div>
+        <div class="action-row">
+          <button class="save-btn" id="save-gemini-key">
+            <span class="btn-content">
+              <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+              Save
+            </span>
+          </button>
+          <button class="remove-btn" id="remove-gemini-key" hidden>Remove</button>
+        </div>
+        <div class="help">
+          <button class="help-toggle" id="gemini-help-toggle" aria-expanded="false" aria-controls="gemini-help">
+            <span class="help-toggle-label">
+              <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+              How to get your Gemini API key
+            </span>
+            <span class="free-badge">Free</span>
+            <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+          </button>
+          <div class="help-body" id="gemini-help">
+            <div class="help-body-inner">
+              <ol class="help-steps">
+                <li>Open <strong>Google AI Studio</strong> and sign in with your Google account.</li>
+                <li>Click <strong>Create API key</strong> (top right).</li>
+                <li>Copy the key that's generated.</li>
+                <li>Paste it in the field above and click <strong>Save</strong>.</li>
+              </ol>
+              <p class="help-note">Gemini has a free tier — no billing setup needed to start.</p>
+              <a class="get-key-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                Get API key
+                <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Mistral Card -->
@@ -458,14 +760,48 @@
             </button>
           </div>
         </div>
-        <button class="save-btn" id="save-mistral-key">
-          <span class="btn-content">
-            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-            Save
-          </span>
-        </button>
+        <div class="key-hint" id="mistral-key-hint" hidden></div>
+        <div class="action-row">
+          <button class="save-btn" id="save-mistral-key">
+            <span class="btn-content">
+              <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+              Save
+            </span>
+          </button>
+          <button class="remove-btn" id="remove-mistral-key" hidden>Remove</button>
+        </div>
+        <div class="help">
+          <button class="help-toggle" id="mistral-help-toggle" aria-expanded="false" aria-controls="mistral-help">
+            <span class="help-toggle-label">
+              <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+              How to get your Mistral API key
+            </span>
+            <span class="free-badge">Free</span>
+            <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+          </button>
+          <div class="help-body" id="mistral-help">
+            <div class="help-body-inner">
+              <ol class="help-steps">
+                <li>Open the <strong>Mistral Console</strong> and sign up or log in.</li>
+                <li>Open <strong>API Keys</strong> in the sidebar.</li>
+                <li>Click <strong>Create new key</strong> and copy it. You may need to verify a phone number and activate the free "Experiment" plan first.</li>
+                <li>Paste it in the field above and click <strong>Save</strong>.</li>
+              </ol>
+              <p class="help-note">Mistral's free Experiment tier works here (phone verification required).</p>
+              <a class="get-key-btn" href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer">
+                Get API key
+                <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
+    <p class="privacy-note">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      Keys are stored locally in your browser and only sent to the provider's API.
+    </p>
 
     <div class="footer">
       <p>YouTube Transcript Extractor v1.2</p>
