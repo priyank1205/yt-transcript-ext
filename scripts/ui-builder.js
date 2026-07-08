@@ -235,56 +235,10 @@ function injectSidebar(secondary) {
     const genBtn = document.createElement('button');
     genBtn.textContent = 'Generate summary';
     genBtn.className = 'yt-timestamps-generate-button';
-    genBtn.onclick = () => {
-        updateGenerateButton('extracting');
-        
-        const headerModelSelect = document.getElementById('header-model-select');
-        const selectedModel = headerModelSelect ? headerModelSelect.value : 'auto';
-        
-        // Send analysis request with timeout
-        const sendAnalysis = (model, timeout = 120000) => {
-            return new Promise((resolve) => {
-                let resolved = false;
-                
-                const timer = setTimeout(() => {
-                    if (!resolved) {
-                        resolved = true;
-                        resolve({ success: false, error: `Request timed out` });
-                    }
-                }, timeout);
-                
-                chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model }, (res) => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timer);
-                        if (chrome.runtime.lastError) {
-                            resolve({ success: false, error: chrome.runtime.lastError.message });
-                        } else {
-                            resolve(res || { success: false, error: 'No response from background' });
-                        }
-                    } else {
-                        resolve({ success: false, error: 'No response from background' });
-                    }
-                });
-            });
-        };
-        
-        // Main execution
-        (async () => {
-            try {
-                const result = await sendAnalysis(selectedModel);
-                
-                if (result && result.success) {
-                    updateGenerateButton('done');
-                } else {
-                    updateGenerateButton('error', result?.error || 'Unknown error', result?.keepOpen);
-                }
-            } catch (e) {
-                updateGenerateButton('error', 'Extension context invalidated');
-            }
-        })();
-    };
-    
+    // Wire the button based on whether an API key is configured
+    // ('Generate summary' vs 'Set API keys' -> opens settings)
+    setGenerateButtonMode(genBtn);
+
     // Append elements to action area
     actionArea.appendChild(genBtn);
     panelBody.appendChild(actionArea);
@@ -301,6 +255,13 @@ function injectSidebar(secondary) {
     observePlayerResize();
     // Re-apply after a short delay to catch late layout shifts
     setTimeout(applyPlayerHeight, 500);
+
+    // First-run onboarding: point new users to the settings gear icon
+    chrome.storage.local.get(['SHOW_SETTINGS_HINT'], (res) => {
+        if (res.SHOW_SETTINGS_HINT) {
+            showSettingsHint(panel, gearIcon);
+        }
+    });
 
     // Restore cached summary if available (e.g. after miniplayer toggle)
     const cachedSummary = getCachedSummary(getCurrentVideoId());
@@ -350,6 +311,141 @@ function updateModelDropdown(selectEl) {
         }
         selectEl.value = defaultModel;
     });
+}
+
+// Function to show a first-run tooltip pointing at the settings gear icon
+function showSettingsHint(panel, gearIcon) {
+    if (!panel || !gearIcon) return;
+    // Anchor to the container (not the panel) — the panel clips with overflow:hidden
+    const host = panel.parentElement || panel;
+    if (host.querySelector('.yt-settings-hint')) return; // avoid duplicates
+
+    // Draw the eye to the gear
+    gearIcon.classList.add('yt-gear-pulse');
+
+    const hint = document.createElement('div');
+    hint.className = 'yt-settings-hint';
+
+    const arrow = document.createElement('div');
+    arrow.className = 'yt-settings-hint-arrow';
+
+    const title = document.createElement('div');
+    title.className = 'yt-settings-hint-title';
+    title.textContent = 'Manage your API keys here';
+
+    const text = document.createElement('div');
+    text.className = 'yt-settings-hint-text';
+    text.textContent = 'Open Settings from this icon anytime to add or update your Gemini and Mistral API keys.';
+
+    const dismiss = document.createElement('button');
+    dismiss.className = 'yt-settings-hint-dismiss';
+    dismiss.textContent = 'Got it';
+
+    hint.appendChild(arrow);
+    hint.appendChild(title);
+    hint.appendChild(text);
+    hint.appendChild(dismiss);
+
+    // Anchor just below the header, under the gear
+    const header = panel.querySelector('.yt-timestamps-panel-header');
+    if (header) hint.style.top = `${header.offsetHeight + 6}px`;
+
+    const close = () => {
+        hint.remove();
+        gearIcon.classList.remove('yt-gear-pulse');
+        gearIcon.removeEventListener('click', close);
+        chrome.storage.local.set({ SHOW_SETTINGS_HINT: false });
+    };
+
+    dismiss.addEventListener('click', (e) => {
+        e.stopPropagation();
+        close();
+    });
+
+    // Also dismiss once the user opens settings via the gear
+    gearIcon.addEventListener('click', close, { once: true });
+
+    host.appendChild(hint);
+}
+
+// Run the transcript -> summary analysis flow (used when at least one API key is set)
+function runAnalysis() {
+    updateGenerateButton('extracting');
+
+    const headerModelSelect = document.getElementById('header-model-select');
+    const selectedModel = headerModelSelect ? headerModelSelect.value : 'auto';
+
+    // Send analysis request with timeout
+    const sendAnalysis = (model, timeout = 120000) => {
+        return new Promise((resolve) => {
+            let resolved = false;
+
+            const timer = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve({ success: false, error: `Request timed out` });
+                }
+            }, timeout);
+
+            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model }, (res) => {
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timer);
+                    if (chrome.runtime.lastError) {
+                        resolve({ success: false, error: chrome.runtime.lastError.message });
+                    } else {
+                        resolve(res || { success: false, error: 'No response from background' });
+                    }
+                } else {
+                    resolve({ success: false, error: 'No response from background' });
+                }
+            });
+        });
+    };
+
+    // Main execution
+    (async () => {
+        try {
+            const result = await sendAnalysis(selectedModel);
+
+            if (result && result.success) {
+                updateGenerateButton('done');
+            } else {
+                updateGenerateButton('error', result?.error || 'Unknown error', result?.keepOpen);
+            }
+        } catch (e) {
+            updateGenerateButton('error', 'Extension context invalidated');
+        }
+    })();
+}
+
+// Toggle the primary button between generating a summary and prompting for API keys.
+// With no key set, the button opens the settings page instead of running analysis.
+function setGenerateButtonMode(genBtn) {
+    if (!genBtn) return;
+    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY'], (res) => {
+        const hasKey = !!(res.GEMINI_API_KEY || res.MISTRAL_API_KEY);
+        const emptyText = document.querySelector('.yt-empty-text');
+        if (hasKey) {
+            genBtn.textContent = 'Generate summary';
+            genBtn.classList.remove('yt-needs-keys');
+            genBtn.onclick = runAnalysis;
+            if (emptyText) emptyText.textContent = 'Generate an AI-powered summary with timestamps';
+        } else {
+            genBtn.textContent = 'Set API keys';
+            genBtn.classList.add('yt-needs-keys');
+            genBtn.onclick = () => { chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" }); };
+            if (emptyText) emptyText.textContent = 'Add a Gemini or Mistral API key to start generating summaries';
+        }
+    });
+}
+
+// Re-evaluate the button mode when keys change, but only while the button is idle
+function refreshGenerateButtonMode() {
+    const genBtn = document.querySelector('.yt-timestamps-generate-button');
+    if (!genBtn) return;
+    if (genBtn.disabled || genBtn.classList.contains('yt-error-state')) return;
+    setGenerateButtonMode(genBtn);
 }
 
 // Function to update the generate button state

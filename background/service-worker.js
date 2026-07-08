@@ -4,6 +4,15 @@
 import { GeminiClient } from '../scripts/gemini-client.js';
 import { MistralClient } from '../scripts/mistral-client.js';
 
+// First-run onboarding: on fresh install, open the settings page and flag the
+// in-page tooltip that points new users to the settings gear icon.
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.storage.local.set({ SHOW_SETTINGS_HINT: true });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') });
+  }
+});
+
 // Helper: send a message to a tab and await it to prevent the service worker from terminating prematurely
 async function sendTabMessage(tabId, message) {
   try {

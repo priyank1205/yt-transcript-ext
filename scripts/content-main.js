@@ -15,7 +15,19 @@ function initApp() {
             currentModel = result.SELECTED_MODEL;
         }
     });
-    
+
+    // Keep the panel in sync when API keys change (fires across tabs, e.g. after
+    // saving a key on the settings page): refresh the model dropdown and flip the
+    // primary button between "Generate summary" and "Set API keys".
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        if (changes.GEMINI_API_KEY || changes.MISTRAL_API_KEY) {
+            const selectEl = document.getElementById('header-model-select');
+            if (typeof updateModelDropdown === 'function') updateModelDropdown(selectEl);
+            if (typeof refreshGenerateButtonMode === 'function') refreshGenerateButtonMode();
+        }
+    });
+
     // Initial check
     handleNavigation();
 }
@@ -79,6 +91,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const selectEl = document.getElementById('header-model-select');
         if (typeof updateModelDropdown === 'function') {
             updateModelDropdown(selectEl);
+        }
+        if (typeof refreshGenerateButtonMode === 'function') {
+            refreshGenerateButtonMode();
         }
         sendResponse({ success: true });
         return true;
