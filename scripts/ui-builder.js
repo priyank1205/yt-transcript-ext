@@ -38,6 +38,43 @@ function _invalidateCache() {
     _cachedPanelBody = null;
 }
 
+// --- Panel theme (light/dark) ---------------------------------------------
+// The panel ships a dark skin by default and adds a `yt-theme-light` class to
+// the container when the resolved theme is light. Resolution: an explicit
+// 'light'/'dark' override wins; 'system' (default) follows YouTube's own theme,
+// which YouTube signals via the `dark` attribute on <html>.
+let _themePref = 'system';
+let _ytThemeObserver = null;
+
+function getYouTubeTheme() {
+    return document.documentElement.hasAttribute('dark') ? 'dark' : 'light';
+}
+
+function applyPanelTheme(pref, containerEl) {
+    const container = containerEl || document.querySelector('.yt-timestamps-container');
+    if (!container) return;
+    const mode = (pref === 'light' || pref === 'dark') ? pref : getYouTubeTheme();
+    container.classList.toggle('yt-theme-light', mode === 'light');
+}
+
+// Update the stored preference and re-apply (called when the override changes).
+function setPanelThemePref(pref) {
+    _themePref = pref || 'system';
+    applyPanelTheme(_themePref);
+}
+
+// Follow live YouTube theme toggles while the override is on 'system'.
+function ensureYtThemeObserver() {
+    if (_ytThemeObserver) return;
+    _ytThemeObserver = new MutationObserver(() => {
+        if (_themePref === 'system') applyPanelTheme('system');
+    });
+    _ytThemeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['dark']
+    });
+}
+
 function getCurrentVideoId() {
     return new URLSearchParams(window.location.search).get('v');
 }
@@ -146,7 +183,9 @@ function injectSidebar(secondary) {
     // Create container element
     const container = document.createElement('div');
     container.className = 'yt-timestamps-container';
-    
+    // Apply the theme up-front (follows YouTube by default) to avoid a flash
+    applyPanelTheme('system', container);
+
     // Create panel element
     const panel = document.createElement('div');
     panel.className = 'yt-timestamps-panel';
@@ -217,7 +256,7 @@ function injectSidebar(secondary) {
     emptyState.className = 'yt-timestamps-empty-state';
     emptyState.innerHTML = `
         <div class="yt-empty-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
             </svg>
@@ -255,6 +294,14 @@ function injectSidebar(secondary) {
     observePlayerResize();
     // Re-apply after a short delay to catch late layout shifts
     setTimeout(applyPlayerHeight, 500);
+
+    // Load the theme preference and keep the panel in sync with live YouTube
+    // theme toggles (when following the system).
+    chrome.storage.local.get(['THEME_PREF'], (res) => {
+        _themePref = res.THEME_PREF || 'system';
+        applyPanelTheme(_themePref, container);
+    });
+    ensureYtThemeObserver();
 
     // First-run onboarding: point new users to the settings gear icon
     chrome.storage.local.get(['SHOW_SETTINGS_HINT'], (res) => {
@@ -629,8 +676,10 @@ function renderTimestampsUI(summaryText) {
                 }
             };
             
-            tsDiv.onmouseover = () => { tsDiv.style.background = '#262626'; glowBorder.style.opacity = '1'; };
-            tsDiv.onmouseout = () => { tsDiv.style.background = '#1a1a1a'; glowBorder.style.opacity = '0'; };
+            // Hover background is handled by the CSS `:hover` rule so it stays
+            // theme-aware; here we only toggle the red glow overlay.
+            tsDiv.onmouseover = () => { glowBorder.style.opacity = '1'; };
+            tsDiv.onmouseout = () => { glowBorder.style.opacity = '0'; };
             tsDiv.onclick = () => {
                 const video = document.querySelector('video');
                 if (video) video.currentTime = sec;

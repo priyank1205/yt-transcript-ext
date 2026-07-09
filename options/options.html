@@ -659,6 +659,67 @@
       fill: #52525b;
       flex-shrink: 0;
     }
+
+    /* Appearance section */
+    .appearance-section {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+    }
+
+    .appearance-header {
+      margin-bottom: 12px;
+    }
+
+    .appearance-title {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fafafa;
+      letter-spacing: -0.01em;
+    }
+
+    .appearance-sub {
+      display: block;
+      font-size: 12px;
+      color: #52525b;
+      margin-top: 2px;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 4px;
+      background: #09090b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 4px;
+    }
+
+    .segmented-option {
+      flex: 1;
+      padding: 8px 0;
+      background: transparent;
+      color: #a1a1aa;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .segmented-option:hover {
+      color: #fafafa;
+    }
+
+    .segmented-option[aria-checked="true"] {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fafafa;
+    }
   </style>
 </head>
 <body>
@@ -795,6 +856,18 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="appearance-section">
+      <div class="appearance-header">
+        <span class="appearance-title">Panel appearance</span>
+        <span class="appearance-sub">How the summary panel matches YouTube's theme</span>
+      </div>
+      <div class="segmented" id="theme-segmented" role="radiogroup" aria-label="Panel appearance">
+        <button class="segmented-option" data-theme="system" role="radio" aria-checked="true">System</button>
+        <button class="segmented-option" data-theme="light" role="radio" aria-checked="false">Light</button>
+        <button class="segmented-option" data-theme="dark" role="radio" aria-checked="false">Dark</button>
       </div>
     </div>
 

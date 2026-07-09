@@ -189,6 +189,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: #666;
 }
 
 .yt-empty-text {
@@ -199,25 +200,37 @@
 
 /* Model selection dropdown styles */
 .yt-timestamps-model-select {
-  background: #1a1a1a;
+  background-color: #1a1a1a;
   color: #ccc;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 4px 24px 4px 8px;
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  /* Drop the native OS arrow for a caret that matches the panel */
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .yt-timestamps-model-select:hover {
   border-color: #666;
-  background: #222;
+  background-color: #222;
 }
 
 .yt-timestamps-model-select:focus {
   border-color: #FF0000;
+}
+
+/* Dropdown list items (Chrome only styles option bg/color) */
+.yt-timestamps-model-select option {
+  background: #1a1a1a;
+  color: #eaeaea;
 }
 
 .yt-timestamps-model-select option:disabled {
@@ -484,4 +497,208 @@
 .yt-timestamps-panel-header .gear-icon.yt-gear-pulse {
   animation: ytGearPulse 1.5s ease-in-out infinite !important;
   opacity: 1 !important;
+}
+
+/* ==========================================================================
+   Light theme — native to light YouTube. Applied when the container carries
+   `yt-theme-light` (added by applyPanelTheme in ui-builder.js). Dark stays the
+   default (no class). Overrides use `!important` only where the base rule does.
+   Brand red is kept, toned to #cc0000 where it sits on white for contrast.
+   ========================================================================== */
+
+/* Panel shell — a grey surface so the panel reads against YouTube's white page,
+   with white cards layered on top (the same grey-surface pattern YouTube uses
+   for its own light side panels). */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel {
+  background: #f2f2f2;
+  border-color: #dcdcdc;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Header — a shade darker than the panel body for separation */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header {
+  background: #e41d1d;
+  border-bottom-color: #d2d2d2;
+}
+
+/* Title + collapse chevron sit on the red header bar — keep them near-white. */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header h3 {
+  color: #fcfcfc;
+}
+
+/* Gear sits on the red header bar — keep it solid white in both states */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .gear-icon {
+  color: #fff;
+  opacity: 1;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .gear-icon:hover {
+  color: #fff;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-accordion-toggle-icon {
+  color: #fcfcfc;
+}
+
+/* Section header */
+.yt-timestamps-container.yt-theme-light .yt-section-header {
+  color: rgba(0, 0, 0, 0.5) !important;
+  opacity: 1 !important;
+  border-bottom-color: #d4d4d4 !important;
+}
+
+/* Accordion (expanded description) — nested detail under a white item, so a
+   touch greyer than the item */
+.yt-timestamps-container.yt-theme-light .yt-accordion-content {
+  background: #f2f2f2 !important;
+  border-color: #dcdcdc !important;
+  color: #515151 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-accordion-content.expanded {
+  background: #faf6f6 !important;
+  border-color: #e2cece !important;
+}
+
+/* Model select — soft pink control that reads against the red header,
+   with a red caret and a clean white dropdown list */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select {
+  background-color: #ffdbdb;
+  color: #8a0000;
+  border-color: rgba(204, 0, 0, 0.25);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23cc0000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:hover {
+  background-color: #ffcccc;
+  border-color: rgba(204, 0, 0, 0.45);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:focus {
+  border-color: #cc0000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option {
+  background: #fff;
+  color: #0f0f0f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option:disabled {
+  color: #909090;
+  background: #fff;
+}
+
+/* Empty state */
+.yt-timestamps-container.yt-theme-light .yt-empty-text {
+  color: #606060;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-empty-icon {
+  color: #909090;
+}
+
+/* Generate button */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-generate-button {
+  background: #fff;
+  border-color: rgba(204, 0, 0, 0.7);
+  color: rgba(204, 0, 0, 0.9);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-generate-button:hover {
+  background: #fff5f5;
+  border-color: #a30000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-generate-button:active {
+  background: #ffecec;
+  border-color: #8a0000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-generate-button:disabled:hover {
+  background: #fff;
+  border-color: #cc0000;
+}
+
+/* Spinner (shown inside the light button) */
+.yt-timestamps-container.yt-theme-light .yt-spinner {
+  border-color: #e0a0a0;
+  border-top-color: #cc0000;
+}
+
+/* Error state */
+.yt-timestamps-container.yt-theme-light .yt-error-state {
+  border-color: #cc0000 !important;
+  color: #cc0000 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-error-state:hover {
+  background: #fff !important;
+  border-color: #cc0000 !important;
+}
+
+/* Timestamp items — white cards that lift off the grey panel */
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item {
+  background: #fbfbfb;
+  border-color: #e0e0e0;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item:hover {
+  background: #fafafa;
+  border-color: #cc0000;
+}
+
+/* Row whose description is open — tinted so the open row + its body read as one unit */
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item:has(+ .yt-accordion-content.expanded) {
+  background: #f0e3e3;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-time {
+  color: #cc0000 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-title {
+  color: #525151 !important;
+}
+
+/* Brighten the title of the currently-open row */
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item:has(+ .yt-accordion-content.expanded) .yt-title {
+  color: #473b3b !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-expand-btn {
+  color: #606060 !important;
+}
+
+/* Softer red glow on light */
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item:hover .yt-glow-border {
+  box-shadow: 0 0 10px rgba(204, 0, 0, 0.25);
+}
+
+/* First-run settings hint */
+.yt-timestamps-container.yt-theme-light .yt-settings-hint {
+  background: #fff !important;
+  border-color: #e5b3b3 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 16px rgba(204, 0, 0, 0.08) !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-settings-hint-arrow {
+  background: #fff !important;
+  border-left-color: #e5b3b3 !important;
+  border-top-color: #e5b3b3 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-settings-hint-title {
+  color: #0f0f0f !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-settings-hint-text {
+  color: #606060 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-settings-hint-dismiss {
+  background: #cc0000 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-settings-hint-dismiss:hover {
+  background: #a30000 !important;
 }

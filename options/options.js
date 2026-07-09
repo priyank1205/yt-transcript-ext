@@ -73,6 +73,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- Appearance (panel theme) ---
+  // Persists THEME_PREF; the in-page panel reacts live via chrome.storage.onChanged.
+  const themeSegmented = document.getElementById('theme-segmented');
+  if (themeSegmented) {
+    const themeOptions = themeSegmented.querySelectorAll('.segmented-option');
+    const setActiveTheme = (pref) => {
+      themeOptions.forEach((o) =>
+        o.setAttribute('aria-checked', o.dataset.theme === pref ? 'true' : 'false')
+      );
+    };
+    chrome.storage.local.get(['THEME_PREF'], (res) => setActiveTheme(res.THEME_PREF || 'system'));
+    themeOptions.forEach((o) => {
+      o.addEventListener('click', () => {
+        const pref = o.dataset.theme;
+        setActiveTheme(pref);
+        chrome.storage.local.set({ THEME_PREF: pref });
+        showToast(`Panel appearance: ${o.textContent}`);
+      });
+    });
+  }
+
   // Toggle password visibility
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     btn.addEventListener('click', () => {
