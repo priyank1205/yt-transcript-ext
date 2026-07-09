@@ -26,6 +26,10 @@ function initApp() {
             if (typeof updateModelDropdown === 'function') updateModelDropdown(selectEl);
             if (typeof refreshGenerateButtonMode === 'function') refreshGenerateButtonMode();
         }
+        // Appearance override changed (e.g. from the settings tab): re-theme the panel.
+        if (changes.THEME_PREF && typeof setPanelThemePref === 'function') {
+            setPanelThemePref(changes.THEME_PREF.newValue || 'system');
+        }
     });
 
     // Initial check
