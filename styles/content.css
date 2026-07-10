@@ -135,6 +135,33 @@
   color: #ccc;
 }
 
+/* Reset ("start over") button — sits next to the title on the summary header.
+   Muted by default, red accent + spin on hover, matching the gear treatment. */
+.yt-timestamps-panel-header .yt-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #888;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.yt-timestamps-panel-header .yt-reset-btn svg {
+  display: block;
+}
+
+.yt-timestamps-panel-header .yt-reset-btn:hover {
+  opacity: 1;
+  color: #ff4d4d;
+  transform: rotate(-30deg);
+}
+
 /* Accordion Toggle Icon */
 .yt-accordion-toggle-icon {
   font-size: 22px;
@@ -198,44 +225,204 @@
   line-height: 1.4;
 }
 
-/* Model selection dropdown styles */
-.yt-timestamps-model-select {
-  background-color: #1a1a1a;
-  color: #ccc;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 4px 24px 4px 8px;
+/* "Detail" header chip — the compact pill that opens the popover slider.
+   Sits on the dark header bar next to the title. */
+.yt-detail-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.yt-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: #ededed;
   font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.yt-detail-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.yt-detail-chip.open {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 77, 77, 0.65);
+}
+
+/* Static badge (generated-summary header) — read-only, no caret/hover. */
+.yt-detail-chip-static {
+  padding: 3px 9px;
+  cursor: default;
+}
+
+.yt-detail-chip-static:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.yt-detail-chip-caret {
+  display: flex;
+  align-items: center;
+  opacity: 0.65;
+  transition: transform 0.18s ease;
+}
+
+.yt-detail-chip.open .yt-detail-chip-caret {
+  transform: rotate(180deg);
+}
+
+/* "Detail" popover — Effort-style slider, mounted onto the container on open. */
+.yt-detail-pop {
+  position: absolute;
+  z-index: 50;
+  width: 236px;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  background: #1c1c1c;
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  user-select: none;
+  animation: ytDetailPopIn 0.16s ease;
+}
+
+@keyframes ytDetailPopIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Title row: "Detail <value>" on the left, "?" help toggle on the right */
+.yt-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.yt-detail-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.yt-detail-label {
+  font-size: 14px;
   font-weight: 500;
+  color: #8f8f8f;
+}
+
+.yt-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.yt-detail-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: #7c7c7c;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.yt-detail-help-btn:hover,
+.yt-detail-help-btn.active {
+  color: #eaeaea;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* End captions above the track */
+.yt-detail-caps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.yt-detail-cap {
+  font-size: 12px;
+  font-weight: 500;
+  color: #8f8f8f;
+  white-space: nowrap;
+}
+
+/* Grooved slider track */
+.yt-detail-track {
+  position: relative;
+  height: 30px;
+  border-radius: 9px;
+  background: #2c2c2c;
   cursor: pointer;
   outline: none;
-  /* Drop the native OS arrow for a caret that matches the panel */
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  touch-action: none;
 }
 
-.yt-timestamps-model-select:hover {
-  border-color: #666;
-  background-color: #222;
+.yt-detail-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5c5c5c;
+  z-index: 1;
+  pointer-events: none;
+  transition: background 0.18s ease;
 }
 
-.yt-timestamps-model-select:focus {
-  border-color: #FF0000;
+.yt-detail-dot.active {
+  background: #3a3a3a;
 }
 
-/* Dropdown list items (Chrome only styles option bg/color) */
-.yt-timestamps-model-select option {
-  background: #1a1a1a;
-  color: #eaeaea;
+/* Lozenge thumb */
+.yt-detail-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  width: 46px;
+  height: 22px;
+  border-radius: 7px;
+  background: #8f8f8f;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+  pointer-events: none;
+  transition: left 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.yt-timestamps-model-select option:disabled {
-  color: #52525b;
-  background: #1a1a1a;
+.yt-detail-track:hover .yt-detail-thumb {
+  background: #9c9c9c;
+}
+
+.yt-detail-track:focus-visible .yt-detail-thumb {
+  box-shadow: 0 0 0 2px rgba(255, 77, 77, 0.6), 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Longer per-level explanation, revealed by the "?" icon */
+.yt-detail-help {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #333;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a8a8a8;
 }
 
 /* Action Area Styles */
@@ -536,6 +723,17 @@
   color: #fff;
 }
 
+/* Reset button sits on the red light-theme header bar — keep it white. */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn {
+  color: #fff;
+  opacity: 0.85;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn:hover {
+  color: #fff;
+  opacity: 1;
+}
+
 .yt-timestamps-container.yt-theme-light .yt-accordion-toggle-icon {
   color: #fcfcfc;
 }
@@ -560,32 +758,88 @@
   border-color: #e2cece !important;
 }
 
-/* Model select — soft pink control that reads against the red header,
-   with a red caret and a clean white dropdown list */
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select {
-  background-color: #ffdbdb;
-  color: #8a0000;
-  border-color: rgba(204, 0, 0, 0.25);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23cc0000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+/* "Detail" chip on the red light-theme header bar — translucent white pill */
+.yt-timestamps-container.yt-theme-light .yt-detail-chip {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:hover {
-  background-color: #ffcccc;
-  border-color: rgba(204, 0, 0, 0.45);
+.yt-timestamps-container.yt-theme-light .yt-detail-chip:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:focus {
-  border-color: #cc0000;
+.yt-timestamps-container.yt-theme-light .yt-detail-chip.open {
+  background: rgba(255, 255, 255, 0.32);
+  border-color: #fff;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option {
+.yt-timestamps-container.yt-theme-light .yt-detail-chip-static:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* "Detail" popover — white card floating on the light panel */
+.yt-timestamps-container.yt-theme-light .yt-detail-pop {
   background: #fff;
+  border-color: #e2d3d3;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* "Detail" slider — light track with a grey lozenge thumb */
+.yt-timestamps-container.yt-theme-light .yt-detail-label {
+  color: #606060;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-value {
   color: #0f0f0f;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option:disabled {
+.yt-timestamps-container.yt-theme-light .yt-detail-cap {
   color: #909090;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-help-btn {
+  color: #909090;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-help-btn:hover,
+.yt-timestamps-container.yt-theme-light .yt-detail-help-btn.active {
+  color: #0f0f0f;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-track {
+  background: #eaeaea;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-dot {
+  background: #c4c4c4;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-dot.active {
+  background: #d8d8d8;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-thumb {
   background: #fff;
+  border: 1px solid #d9c7c7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-track:hover .yt-detail-thumb {
+  background: #fff;
+  border-color: #cbb3b3;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-track:focus-visible .yt-detail-thumb {
+  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-help {
+  border-top-color: #e6d8d8;
+  color: #606060;
 }
 
 /* Empty state */

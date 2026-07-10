@@ -720,6 +720,15 @@
       background: rgba(255, 255, 255, 0.08);
       color: #fafafa;
     }
+
+    .segmented-option:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .segmented-option:disabled:hover {
+      color: #a1a1aa;
+    }
   </style>
 </head>
 <body>
@@ -856,6 +865,18 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="appearance-section">
+      <div class="appearance-header">
+        <span class="appearance-title">Model provider</span>
+        <span class="appearance-sub">Which AI writes your summaries — Auto tries Gemini first, then Mistral</span>
+      </div>
+      <div class="segmented" id="model-segmented" role="radiogroup" aria-label="Model provider">
+        <button class="segmented-option" data-model="auto" role="radio" aria-checked="true">Auto</button>
+        <button class="segmented-option" data-model="gemini" role="radio" aria-checked="false">Gemini</button>
+        <button class="segmented-option" data-model="mistral" role="radio" aria-checked="false">Mistral</button>
       </div>
     </div>
 

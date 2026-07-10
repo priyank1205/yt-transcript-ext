@@ -2,28 +2,18 @@
 
 // Global state
 let currentVideoId = null;
-let currentModel = 'gemini';
 
 // Initialize
 function initApp() {
     window.addEventListener('yt-navigate-start', resetSidebar);
     window.addEventListener('yt-navigate-finish', handleNavigation);
-    
-    // Load the selected model from storage
-    chrome.storage.local.get(['SELECTED_MODEL'], (result) => {
-        if (result.SELECTED_MODEL) {
-            currentModel = result.SELECTED_MODEL;
-        }
-    });
 
     // Keep the panel in sync when API keys change (fires across tabs, e.g. after
-    // saving a key on the settings page): refresh the model dropdown and flip the
-    // primary button between "Generate summary" and "Set API keys".
+    // saving a key on the settings page): flip the primary button between
+    // "Generate summary" and "Set API keys".
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         if (changes.GEMINI_API_KEY || changes.MISTRAL_API_KEY) {
-            const selectEl = document.getElementById('header-model-select');
-            if (typeof updateModelDropdown === 'function') updateModelDropdown(selectEl);
             if (typeof refreshGenerateButtonMode === 'function') refreshGenerateButtonMode();
         }
         // Appearance override changed (e.g. from the settings tab): re-theme the panel.
@@ -63,12 +53,6 @@ function handleNavigation() {
     observeDOM();
 }
 
-// Function to update the current model
-function updateCurrentModel(model) {
-    currentModel = model;
-    chrome.storage.local.set({ SELECTED_MODEL: model });
-}
-
 initApp();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -92,10 +76,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
         return true;
     } else if (request.action === "KEYS_CHANGED") {
-        const selectEl = document.getElementById('header-model-select');
-        if (typeof updateModelDropdown === 'function') {
-            updateModelDropdown(selectEl);
-        }
         if (typeof refreshGenerateButtonMode === 'function') {
             refreshGenerateButtonMode();
         }

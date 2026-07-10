@@ -176,15 +176,302 @@ function disconnectPlayerObserver() {
     _lastAppliedHeight = 0;
 }
 
-// Function to inject sidebar into the DOM
-function injectSidebar(secondary) {
-    if (document.querySelector('.yt-timestamps-container')) return;
+// The "Detail" presets, ordered from least to most detail. `value` is what we
+// send to the backend and persist as the sticky default (SUMMARY_LENGTH); `label`
+// is shown to the user; `help` is the longer explanation revealed by the "?" icon.
+// Standard is the out-of-the-box default; after that, SUMMARY_LENGTH holds
+// whatever level the user last *generated* with, and that becomes the default.
+const DETAIL_OPTIONS = [
+    { value: 'brief', label: 'Brief', help: 'A high-level skim — only the major sections and clear topic shifts, one short line each. Best for a quick sense of what a video covers.' },
+    { value: 'standard', label: 'Standard', help: 'A balanced overview — roughly one point every few minutes, each captured in a sentence or two. The best default for most videos.' },
+    { value: 'detailed', label: 'In-depth', help: 'A thorough breakdown — every distinct topic with concrete specifics like names, numbers, and examples, so you rarely need to watch the video.' }
+];
+const DETAIL_DEFAULT_INDEX = 1;
 
-    // Create container element
-    const container = document.createElement('div');
-    container.className = 'yt-timestamps-container';
-    // Apply the theme up-front (follows YouTube by default) to avoid a flash
-    applyPanelTheme('system', container);
+// The level currently selected in the empty-state chip. Moving the slider updates
+// this in memory only; it's not persisted as the default until the user actually
+// generates (see runAnalysis), so abandoned fiddling doesn't change the default.
+let _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
+
+// Build the interactive header "Detail" control (used before generation): a chip
+// showing the current level (Brief / Standard / In-depth) that opens a popover
+// slider on click. Selecting a level updates the in-memory `_pendingDetail`; it's
+// committed to SUMMARY_LENGTH (the sticky default) only when the user generates.
+// Returns the chip wrapper; the popover is mounted onto the panel container on
+// open (so the panel's overflow:hidden can't clip it).
+function buildDetailChip() {
+    let index = DETAIL_DEFAULT_INDEX;
+    // Start from the default; the stored default (if any) is applied once the
+    // async storage read below resolves.
+    _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
+    let open = false;
+    let helpOpen = false;
+    let dragging = false;
+    const lastIndex = DETAIL_OPTIONS.length - 1;
+
+    // Thumb width (must match CSS). Positions are inset by half the thumb so the
+    // thumb sits fully inside the track at the extremes instead of clipping.
+    const THUMB_W = 46;
+    const posLeft = (frac) => `calc(${THUMB_W / 2}px + (100% - ${THUMB_W}px) * ${frac})`;
+    const fracOf = (i) => (lastIndex ? i / lastIndex : 0);
+
+    // --- Chip (lives in the header) ---
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-detail-chip-wrap';
+
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'yt-detail-chip';
+    chip.title = 'Summary detail';
+    chip.setAttribute('aria-haspopup', 'dialog');
+    chip.setAttribute('aria-expanded', 'false');
+
+    const chipLabel = document.createElement('span');
+    chipLabel.className = 'yt-detail-chip-label';
+
+    const chipCaret = document.createElement('span');
+    chipCaret.className = 'yt-detail-chip-caret';
+    chipCaret.innerHTML = '<svg width="9" height="9" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>';
+
+    chip.appendChild(chipLabel);
+    chip.appendChild(chipCaret);
+    wrap.appendChild(chip);
+
+    // --- Popover (Effort-style slider), mounted on open ---
+    const pop = document.createElement('div');
+    pop.className = 'yt-detail-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Summary detail');
+    pop.hidden = true;
+    // Clicks inside the popover must not bubble to the header (which toggles the
+    // summary accordion) or to the document close-listener.
+    pop.addEventListener('click', (e) => e.stopPropagation());
+
+    // Title row: "Detail <value>" on the left, a "?" help toggle on the right.
+    const top = document.createElement('div');
+    top.className = 'yt-detail-top';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'yt-detail-title';
+    const label = document.createElement('span');
+    label.className = 'yt-detail-label';
+    label.textContent = 'Detail';
+    const value = document.createElement('span');
+    value.className = 'yt-detail-value';
+    titleGroup.appendChild(label);
+    titleGroup.appendChild(value);
+
+    const helpBtn = document.createElement('button');
+    helpBtn.type = 'button';
+    helpBtn.className = 'yt-detail-help-btn';
+    helpBtn.title = 'What does this level mean?';
+    helpBtn.setAttribute('aria-label', 'Explain this detail level');
+    helpBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+    top.appendChild(titleGroup);
+    top.appendChild(helpBtn);
+
+    // End captions on their own row, above the track.
+    const caps = document.createElement('div');
+    caps.className = 'yt-detail-caps';
+    const capLeft = document.createElement('span');
+    capLeft.className = 'yt-detail-cap';
+    capLeft.textContent = 'Quick';
+    const capRight = document.createElement('span');
+    capRight.className = 'yt-detail-cap';
+    capRight.textContent = 'Thorough';
+    caps.appendChild(capLeft);
+    caps.appendChild(capRight);
+
+    // Grooved track with evenly spaced dots and a lozenge thumb.
+    const track = document.createElement('div');
+    track.className = 'yt-detail-track';
+    track.setAttribute('role', 'slider');
+    track.setAttribute('tabindex', '0');
+    track.setAttribute('aria-label', 'Summary detail');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', String(lastIndex));
+
+    const dots = DETAIL_OPTIONS.map((opt, i) => {
+        const dot = document.createElement('span');
+        dot.className = 'yt-detail-dot';
+        dot.style.left = posLeft(fracOf(i));
+        track.appendChild(dot);
+        return dot;
+    });
+
+    const thumb = document.createElement('div');
+    thumb.className = 'yt-detail-thumb';
+    track.appendChild(thumb);
+
+    // Longer per-level explanation, toggled by the "?" icon.
+    const help = document.createElement('div');
+    help.className = 'yt-detail-help';
+    help.hidden = true;
+
+    pop.appendChild(top);
+    pop.appendChild(caps);
+    pop.appendChild(track);
+    pop.appendChild(help);
+
+    function render() {
+        const opt = DETAIL_OPTIONS[index];
+        thumb.style.left = posLeft(fracOf(index));
+        chipLabel.textContent = opt.label;
+        value.textContent = opt.label;
+        help.textContent = opt.help;
+        track.setAttribute('aria-valuenow', String(index));
+        track.setAttribute('aria-valuetext', opt.label);
+        dots.forEach((d, i) => d.classList.toggle('active', i === index));
+    }
+
+    function select(i) {
+        const next = Math.min(lastIndex, Math.max(0, i));
+        index = next;
+        render();
+        // In-memory only — committed to SUMMARY_LENGTH when the user generates.
+        _pendingDetail = DETAIL_OPTIONS[index].value;
+    }
+
+    // Map a pointer x-position to the nearest level index.
+    function indexFromClientX(clientX) {
+        const rect = track.getBoundingClientRect();
+        const usable = rect.width - THUMB_W;
+        if (usable <= 0) return index;
+        let frac = (clientX - rect.left - THUMB_W / 2) / usable;
+        frac = Math.min(1, Math.max(0, frac));
+        return Math.round(frac * lastIndex);
+    }
+
+    track.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        select(indexFromClientX(e.clientX));
+    });
+    track.addEventListener('pointermove', (e) => {
+        if (dragging) select(indexFromClientX(e.clientX));
+    });
+    const endDrag = (e) => {
+        dragging = false;
+        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+
+    track.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); select(index - 1); }
+        else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); select(index + 1); }
+        else if (e.key === 'Home') { e.preventDefault(); select(0); }
+        else if (e.key === 'End') { e.preventDefault(); select(lastIndex); }
+    });
+
+    helpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        helpOpen = !helpOpen;
+        help.hidden = !helpOpen;
+        helpBtn.classList.toggle('active', helpOpen);
+    });
+
+    // --- Open / close the popover ---
+    const onDocClick = (e) => {
+        if (pop.contains(e.target) || chip.contains(e.target)) return;
+        closePop();
+    };
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); closePop(); chip.focus(); }
+    };
+
+    function openPop() {
+        const container = wrap.closest('.yt-timestamps-container');
+        if (!container) return;
+        container.appendChild(pop);
+        pop.hidden = false;
+
+        // Anchor the popover just below the chip, clamped inside the container so
+        // it never spills past the right edge.
+        const chipRect = chip.getBoundingClientRect();
+        const contRect = container.getBoundingClientRect();
+        const popW = pop.offsetWidth || 236;
+        let left = chipRect.left - contRect.left;
+        const maxLeft = contRect.width - popW - 8;
+        if (left > maxLeft) left = Math.max(8, maxLeft);
+        pop.style.left = `${left}px`;
+        pop.style.top = `${chipRect.bottom - contRect.top + 8}px`;
+
+        open = true;
+        chip.setAttribute('aria-expanded', 'true');
+        chip.classList.add('open');
+        track.focus();
+        // Defer so the opening click doesn't immediately close it.
+        setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+        document.addEventListener('keydown', onKeydown, true);
+    }
+
+    function closePop() {
+        open = false;
+        pop.hidden = true;
+        if (pop.parentElement) pop.parentElement.removeChild(pop);
+        chip.setAttribute('aria-expanded', 'false');
+        chip.classList.remove('open');
+        document.removeEventListener('click', onDocClick, true);
+        document.removeEventListener('keydown', onKeydown, true);
+    }
+
+    chip.addEventListener('click', (e) => {
+        // Don't let the click reach the header accordion toggle.
+        e.stopPropagation();
+        if (open) closePop(); else openPop();
+    });
+
+    render();
+
+    // Sync to the stored default (whatever the user last generated with) once
+    // storage resolves. This only updates the in-memory selection/display.
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
+        if (stored !== -1) select(stored);
+    });
+
+    return wrap;
+}
+
+// Build the static "Detail" badge for the generated-summary header: a read-only
+// pill that just reports which level produced the current summary. No popover —
+// changing the level happens in the empty state (via Reset).
+function buildDetailBadge() {
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-detail-chip-wrap';
+
+    const badge = document.createElement('span');
+    badge.className = 'yt-detail-chip yt-detail-chip-static';
+    badge.title = 'Detail level used for this summary';
+    badge.textContent = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].label;
+    wrap.appendChild(badge);
+
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+        const opt = DETAIL_OPTIONS.find((o) => o.value === res.SUMMARY_LENGTH);
+        if (opt) badge.textContent = opt.label;
+    });
+
+    return wrap;
+}
+
+// Gear (settings) icon markup, shared by the empty-state header.
+const GEAR_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
+// Build (or rebuild) the pre-generation empty state inside an existing container:
+// header (title + gear) and body (prompt + Detail slider + Generate button). Used
+// both for the first render and when the user hits Reset on a finished summary, so
+// picking a different Detail level and regenerating is always one path.
+function renderEmptyState(container) {
+    if (!container) return;
+
+    // Clear whatever was there (summary or prior empty state) and drop the DOM cache.
+    container.innerHTML = '';
+    _invalidateCache();
+    container.classList.remove('yt-has-summary');
 
     // Create panel element
     const panel = document.createElement('div');
@@ -193,65 +480,35 @@ function injectSidebar(secondary) {
     // Create panel header element
     const panelHeader = document.createElement('div');
     panelHeader.className = 'yt-timestamps-panel-header';
-    
-    // Create left group (title + model selector)
+
+    // Create left group (title)
     const headerLeft = document.createElement('div');
     headerLeft.className = 'yt-timestamps-header-left';
-    
+
     // Create header title element
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Timestamped Summary';
-    
-    // Create model selection dropdown
-    const headerModelSelect = document.createElement('select');
-    headerModelSelect.id = 'header-model-select';
-    headerModelSelect.className = 'yt-timestamps-model-select';
-    
-    const autoOption = document.createElement('option');
-    autoOption.value = 'auto';
-    autoOption.textContent = 'Auto';
-    
-    const geminiOption = document.createElement('option');
-    geminiOption.value = 'gemini';
-    geminiOption.textContent = 'Gemini';
-    
-    const mistralOption = document.createElement('option');
-    mistralOption.value = 'mistral';
-    mistralOption.textContent = 'Mistral';
-    
-    headerModelSelect.appendChild(autoOption);
-    headerModelSelect.appendChild(geminiOption);
-    headerModelSelect.appendChild(mistralOption);
-    
+
     // Create gear icon element
     const gearIcon = document.createElement('span');
     gearIcon.className = 'gear-icon';
-    gearIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gearIcon.innerHTML = GEAR_SVG;
     gearIcon.onclick = () => {
         chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" });
     };
-    
-    // Append elements
+
+    // Append elements (title + Detail chip on the left, gear on the right)
     headerLeft.appendChild(headerTitle);
-    headerLeft.appendChild(headerModelSelect);
+    headerLeft.appendChild(buildDetailChip());
     panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
-    
-    // Add event listener to header model selection
-    headerModelSelect.addEventListener('change', (e) => {
-        const selectedModel = e.target.value;
-        chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
-    });
-    
-    // Set default selection and disable unavailable models
-    updateModelDropdown(headerModelSelect);
-    
+
     // Create panel body (empty state before generation)
     const panelBody = document.createElement('div');
     panelBody.className = 'yt-timestamps-panel-body';
-    
+
     const emptyState = document.createElement('div');
     emptyState.className = 'yt-timestamps-empty-state';
     emptyState.innerHTML = `
@@ -264,12 +521,12 @@ function injectSidebar(secondary) {
         <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
     `;
     panelBody.appendChild(emptyState);
-    
+
     // Create action area element
     const actionArea = document.createElement('div');
     actionArea.id = 'action-area';
     actionArea.className = 'yt-timestamps-action-area';
-    
+
     // Create generate button element
     const genBtn = document.createElement('button');
     genBtn.textContent = 'Generate summary';
@@ -282,14 +539,12 @@ function injectSidebar(secondary) {
     actionArea.appendChild(genBtn);
     panelBody.appendChild(actionArea);
     panel.appendChild(panelBody);
-    
+
     // Append panel to container
     container.appendChild(panel);
-    
-    // Insert container into secondary
-    secondary.insertBefore(container, secondary.firstChild);
 
     // Apply initial height and observe player for resizes (must be after DOM insertion)
+    _lastAppliedHeight = 0;
     applyPlayerHeight();
     observePlayerResize();
     // Re-apply after a short delay to catch late layout shifts
@@ -301,7 +556,6 @@ function injectSidebar(secondary) {
         _themePref = res.THEME_PREF || 'system';
         applyPanelTheme(_themePref, container);
     });
-    ensureYtThemeObserver();
 
     // First-run onboarding: point new users to the settings gear icon
     chrome.storage.local.get(['SHOW_SETTINGS_HINT'], (res) => {
@@ -309,55 +563,28 @@ function injectSidebar(secondary) {
             showSettingsHint(panel, gearIcon);
         }
     });
+}
+
+// Function to inject sidebar into the DOM
+function injectSidebar(secondary) {
+    if (document.querySelector('.yt-timestamps-container')) return;
+
+    // Create container element
+    const container = document.createElement('div');
+    container.className = 'yt-timestamps-container';
+    // Apply the theme up-front (follows YouTube by default) to avoid a flash
+    applyPanelTheme('system', container);
+
+    // Insert container into secondary, then build the empty state inside it
+    secondary.insertBefore(container, secondary.firstChild);
+    renderEmptyState(container);
+    ensureYtThemeObserver();
 
     // Restore cached summary if available (e.g. after miniplayer toggle)
     const cachedSummary = getCachedSummary(getCurrentVideoId());
     if (cachedSummary) {
         renderTimestampsUI(cachedSummary);
     }
-}
-
-// Function to update model dropdown: disable options for missing/invalid keys, add tooltips
-function updateModelDropdown(selectEl) {
-    if (!selectEl) return;
-    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        const geminiOption = selectEl.querySelector('option[value="gemini"]');
-        const mistralOption = selectEl.querySelector('option[value="mistral"]');
-        const autoOption = selectEl.querySelector('option[value="auto"]');
-
-        if (geminiOption) {
-            if (!result.GEMINI_API_KEY) {
-                geminiOption.disabled = true;
-                geminiOption.title = 'No Gemini API key set — add one in settings';
-            } else {
-                geminiOption.disabled = false;
-                geminiOption.title = '';
-            }
-        }
-
-        if (mistralOption) {
-            if (!result.MISTRAL_API_KEY) {
-                mistralOption.disabled = true;
-                mistralOption.title = 'No Mistral API key set — add one in settings';
-            } else {
-                mistralOption.disabled = false;
-                mistralOption.title = '';
-            }
-        }
-
-        if (autoOption) {
-            autoOption.disabled = false;
-            autoOption.title = '';
-        }
-
-        // Resolve selected model
-        let defaultModel = result.SELECTED_MODEL || 'auto';
-        const selectedOption = selectEl.querySelector(`option[value="${defaultModel}"]`);
-        if (selectedOption && selectedOption.disabled) {
-            defaultModel = 'auto';
-        }
-        selectEl.value = defaultModel;
-    });
 }
 
 // Function to show a first-run tooltip pointing at the settings gear icon
@@ -419,11 +646,9 @@ function showSettingsHint(panel, gearIcon) {
 function runAnalysis() {
     updateGenerateButton('extracting');
 
-    const headerModelSelect = document.getElementById('header-model-select');
-    const selectedModel = headerModelSelect ? headerModelSelect.value : 'auto';
-
-    // Send analysis request with timeout
-    const sendAnalysis = (model, timeout = 120000) => {
+    // Send analysis request with timeout. Model is a global preference (settings
+    // page); length is the "Detail" preset currently selected in the panel chip.
+    const sendAnalysis = (model, length, timeout = 120000) => {
         return new Promise((resolve) => {
             let resolved = false;
 
@@ -434,7 +659,7 @@ function runAnalysis() {
                 }
             }, timeout);
 
-            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model }, (res) => {
+            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model, length: length }, (res) => {
                 if (!resolved) {
                     resolved = true;
                     clearTimeout(timer);
@@ -453,7 +678,17 @@ function runAnalysis() {
     // Main execution
     (async () => {
         try {
-            const result = await sendAnalysis(selectedModel);
+            const prefs = await new Promise((resolve) =>
+                chrome.storage.local.get(['SELECTED_MODEL', 'SUMMARY_LENGTH'], resolve)
+            );
+            const model = prefs.SELECTED_MODEL || 'auto';
+            // Use the level selected in the chip; fall back to the stored default.
+            const length = _pendingDetail || prefs.SUMMARY_LENGTH || 'standard';
+            // Generating commits this level as the new sticky default, so the next
+            // video (and this summary's header badge) opens on it.
+            chrome.storage.local.set({ SUMMARY_LENGTH: length });
+
+            const result = await sendAnalysis(model, length);
 
             if (result && result.success) {
                 updateGenerateButton('done');
@@ -568,15 +803,39 @@ function renderTimestampsUI(summaryText) {
     panelHeader.className = 'yt-timestamps-panel-header';
     panelHeader.style.cursor = 'pointer';
     
+    // Left group: title + Reset. Reset returns to the empty state so the user can
+    // pick a different Detail level and regenerate.
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'yt-timestamps-header-left';
+
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Timestamped Summary';
-    
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'yt-reset-btn';
+    resetBtn.title = 'Start over';
+    resetBtn.setAttribute('aria-label', 'Start over');
+    resetBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    resetBtn.addEventListener('click', (e) => {
+        // Don't let the click bubble to the header (which toggles the accordion).
+        e.stopPropagation();
+        // Clear the cached summary so no re-inject restores it, then rebuild the
+        // empty state (the Detail slider re-syncs to the stored SUMMARY_LENGTH).
+        clearSummaryCache(getCurrentVideoId());
+        renderEmptyState(container);
+    });
+
+    headerLeft.appendChild(headerTitle);
+    headerLeft.appendChild(buildDetailBadge());
+    headerLeft.appendChild(resetBtn);
+
     const toggleIcon = document.createElement('span');
     toggleIcon.className = 'yt-accordion-toggle-icon';
     toggleIcon.textContent = '›';
-    
-    panelHeader.appendChild(headerTitle);
+
+    panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(toggleIcon);
     panel.appendChild(panelHeader);
     
@@ -589,9 +848,16 @@ function renderTimestampsUI(summaryText) {
     
     // Process summary text
     const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
-    
+    let itemCount = 0;
+
     lines.forEach(line => {
-        const cleanLine = line.replace(/```/g, '').trim();
+        // Normalize common LLM formatting drift so valid points aren't silently
+        // dropped: strip code fences/backticks, a leading list bullet, and
+        // markdown bold markers.
+        let cleanLine = line.replace(/`+/g, '').trim();
+        cleanLine = cleanLine.replace(/^[-*•]\s+/, '');
+        cleanLine = cleanLine.replace(/\*\*/g, '').trim();
+
         if (cleanLine.startsWith('#')) {
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'yt-section-header';
@@ -599,12 +865,17 @@ function renderTimestampsUI(summaryText) {
             timestampsList.appendChild(sectionHeader);
             return;
         }
-        
-        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
+
+        // Match a timestamped point, tolerating format drift: optional brackets
+        // around the time, a hyphen / en-dash / em-dash (or nothing) before the
+        // title, and an optional ": description". This is what prevents the
+        // "sections but no items" render when the model swaps the plain hyphen.
+        const timeMatch = cleanLine.match(/^\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*[-–—]?\s*(.+?)(?::\s*(.+))?$/);
         if (timeMatch) {
             const time = timeMatch[1];
-            const title = timeMatch[2];
-            const description = timeMatch[3]; 
+            const title = timeMatch[2].trim();
+            const description = (timeMatch[3] || '').trim();
+            itemCount++;
             let sec = 0;
             const timeParts = time.split(':').map(Number);
             if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
@@ -689,7 +960,14 @@ function renderTimestampsUI(summaryText) {
             timestampsList.appendChild(accordionContent);
         }
     });
-    
+
+    // Safety net: if the model returned section headers but not a single
+    // parseable point, log the raw output so a recurrence can be diagnosed
+    // (rather than silently showing a header-only wall).
+    if (itemCount === 0) {
+        console.warn('[yt-timestamps] No timestamp items parsed from summary. Raw output:\n', summaryText);
+    }
+
     panelContent.appendChild(timestampsList);
     panel.appendChild(panelContent);
     container.appendChild(panel);

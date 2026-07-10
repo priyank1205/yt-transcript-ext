@@ -55,12 +55,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const configured = { gemini: false, mistral: false };
 
   // Load saved keys and paint each card's state
-  chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY'], (result) => {
+  chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
     configured.gemini = !!result.GEMINI_API_KEY;
     configured.mistral = !!result.MISTRAL_API_KEY;
     applyKeyState(providers.gemini, result.GEMINI_API_KEY || null);
     applyKeyState(providers.mistral, result.MISTRAL_API_KEY || null);
     updateBanner();
+    setActiveModel(result.SELECTED_MODEL || 'auto');
+    updateModelSegmented();
   });
 
   // Wire up each provider
@@ -70,6 +72,45 @@ document.addEventListener('DOMContentLoaded', () => {
     p.helpToggle.addEventListener('click', () => {
       const open = p.helpToggle.getAttribute('aria-expanded') === 'true';
       setAccordion(p, !open);
+    });
+  });
+
+  // --- Model provider (which AI generates summaries) ---
+  // Persists SELECTED_MODEL (global). The panel reads it at generate time.
+  // Providers without a saved key are disabled; if the active provider loses its
+  // key, we fall back to Auto.
+  const modelSegmented = document.getElementById('model-segmented');
+  const modelOptions = modelSegmented
+    ? Array.from(modelSegmented.querySelectorAll('.segmented-option'))
+    : [];
+
+  function setActiveModel(model) {
+    modelOptions.forEach((o) =>
+      o.setAttribute('aria-checked', o.dataset.model === model ? 'true' : 'false')
+    );
+  }
+
+  function updateModelSegmented() {
+    const available = { auto: true, gemini: configured.gemini, mistral: configured.mistral };
+    modelOptions.forEach((o) => {
+      const m = o.dataset.model;
+      const ok = !!available[m];
+      o.disabled = !ok;
+      o.title = ok ? '' : `No ${o.textContent} API key set — add one above`;
+    });
+    const active = modelOptions.find((o) => o.getAttribute('aria-checked') === 'true');
+    if (active && active.disabled) {
+      setActiveModel('auto');
+      chrome.storage.local.set({ SELECTED_MODEL: 'auto' });
+    }
+  }
+
+  modelOptions.forEach((o) => {
+    o.addEventListener('click', () => {
+      if (o.disabled) return;
+      setActiveModel(o.dataset.model);
+      chrome.storage.local.set({ SELECTED_MODEL: o.dataset.model });
+      showToast(`Model: ${o.textContent}`);
     });
   });
 
@@ -151,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         configured[p.name] = true;
         applyKeyState(p, key);
         updateBanner();
+        updateModelSegmented();
         showToast(`${p.label} key saved`);
         chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
       }, 400);
@@ -164,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
       resetVisibility(p.input);
       applyKeyState(p, null);
       updateBanner();
+      updateModelSegmented();
       showToast(`${p.label} key removed`);
       chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
     });
