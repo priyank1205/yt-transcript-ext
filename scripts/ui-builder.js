@@ -903,48 +903,54 @@ function renderTimestampsUI(summaryText) {
             accordionContent.className = 'yt-accordion-content';
             accordionContent.textContent = description;
             
-            let isExpanded = false;
             expandBtn.onclick = e => {
                 e.stopPropagation();
-                
+
                 const scrollContainer = panelContent;
-                
-                // Close the currently expanded accordion instantly (no transition)
-                if (_expandedAccordion && _expandedAccordion !== accordionContent) {
+
+                // Single source of truth: is THIS item the one currently open?
+                // (No per-button flag — a stale one caused switches to take two clicks.)
+                const wasExpanded = _expandedAccordion === accordionContent;
+
+                // Case 1: clicking the already-open item → toggle it closed (animated).
+                if (wasExpanded) {
+                    accordionContent.classList.remove('expanded');
+                    expandBtn.textContent = '+';
+                    _expandedAccordion = null;
+                    _expandedAccordionBtn = null;
+                    return;
+                }
+
+                // Case 2: a different item is open → collapse it instantly (no
+                // transition), anchoring scroll so the clicked row doesn't jump.
+                if (_expandedAccordion) {
                     const oldAccordion = _expandedAccordion;
-                    
+
                     // Capture position before instant collapse
                     const yBefore = tsDiv.getBoundingClientRect().top;
-                    
+
                     // Disable transition, collapse, force reflow
                     oldAccordion.style.setProperty('transition', 'none', 'important');
                     oldAccordion.classList.remove('expanded');
                     oldAccordion.offsetHeight; // force reflow
-                    
+
                     // Re-enable transition
                     oldAccordion.style.removeProperty('transition');
-                    
+
                     // Correct scroll to keep tsDiv visually anchored
                     const yAfter = tsDiv.getBoundingClientRect().top;
                     scrollContainer.scrollTop += (yAfter - yBefore);
-                    
+
                     if (_expandedAccordionBtn) {
                         _expandedAccordionBtn.textContent = '+';
                     }
                 }
-                
-                isExpanded = !isExpanded;
-                expandBtn.textContent = isExpanded ? '−' : '+';
-                
-                if (isExpanded) {
-                    accordionContent.classList.add('expanded');
-                    _expandedAccordion = accordionContent;
-                    _expandedAccordionBtn = expandBtn;
-                } else {
-                    accordionContent.classList.remove('expanded');
-                    _expandedAccordion = null;
-                    _expandedAccordionBtn = null;
-                }
+
+                // Case 3 (falls through from 2, or nothing was open): open this item.
+                accordionContent.classList.add('expanded');
+                expandBtn.textContent = '−';
+                _expandedAccordion = accordionContent;
+                _expandedAccordionBtn = expandBtn;
             };
             
             // Hover background is handled by the CSS `:hover` rule so it stays
