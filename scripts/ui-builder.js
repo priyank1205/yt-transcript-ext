@@ -176,121 +176,286 @@ function disconnectPlayerObserver() {
     _lastAppliedHeight = 0;
 }
 
-// The per-video "Detail" presets, ordered from least to most detail. `value` is
-// what we persist (SUMMARY_LENGTH) and send to the backend; `label` is shown to
-// the user. Middle (Standard) is the smart default.
+// The "Detail" presets, ordered from least to most detail. `value` is what we
+// send to the backend and persist as the sticky default (SUMMARY_LENGTH); `label`
+// is shown to the user; `help` is the longer explanation revealed by the "?" icon.
+// Standard is the out-of-the-box default; after that, SUMMARY_LENGTH holds
+// whatever level the user last *generated* with, and that becomes the default.
 const DETAIL_OPTIONS = [
-    { value: 'brief', label: 'Brief' },
-    { value: 'standard', label: 'Standard' },
-    { value: 'detailed', label: 'In-depth' }
+    { value: 'brief', label: 'Brief', help: 'A high-level skim — only the major sections and clear topic shifts, one short line each. Best for a quick sense of what a video covers.' },
+    { value: 'standard', label: 'Standard', help: 'A balanced overview — roughly one point every few minutes, each captured in a sentence or two. The best default for most videos.' },
+    { value: 'detailed', label: 'In-depth', help: 'A thorough breakdown — every distinct topic with concrete specifics like names, numbers, and examples, so you rarely need to watch the video.' }
 ];
 const DETAIL_DEFAULT_INDEX = 1;
 
-// Build the "Detail" slider: an Effort-style track (title + current value,
-// Quick↔Thorough end caps, three dots + a thumb). Selecting a level persists
-// SUMMARY_LENGTH; the picked level is read back at generate time. The control is
-// created with the default selected, then synced to the stored preference async.
-function buildDetailSlider() {
+// The level currently selected in the empty-state chip. Moving the slider updates
+// this in memory only; it's not persisted as the default until the user actually
+// generates (see runAnalysis), so abandoned fiddling doesn't change the default.
+let _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
+
+// Build the interactive header "Detail" control (used before generation): a chip
+// showing the current level (Brief / Standard / In-depth) that opens a popover
+// slider on click. Selecting a level updates the in-memory `_pendingDetail`; it's
+// committed to SUMMARY_LENGTH (the sticky default) only when the user generates.
+// Returns the chip wrapper; the popover is mounted onto the panel container on
+// open (so the panel's overflow:hidden can't clip it).
+function buildDetailChip() {
     let index = DETAIL_DEFAULT_INDEX;
+    // Start from the default; the stored default (if any) is applied once the
+    // async storage read below resolves.
+    _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
+    let open = false;
+    let helpOpen = false;
+    let dragging = false;
     const lastIndex = DETAIL_OPTIONS.length - 1;
 
     // Thumb width (must match CSS). Positions are inset by half the thumb so the
-    // end stops and the thumb sit fully inside the rail instead of clipping.
-    const THUMB_W = 22;
+    // thumb sits fully inside the track at the extremes instead of clipping.
+    const THUMB_W = 46;
     const posLeft = (frac) => `calc(${THUMB_W / 2}px + (100% - ${THUMB_W}px) * ${frac})`;
     const fracOf = (i) => (lastIndex ? i / lastIndex : 0);
 
-    const control = document.createElement('div');
-    control.className = 'yt-detail-control';
+    // --- Chip (lives in the header) ---
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-detail-chip-wrap';
 
-    const head = document.createElement('div');
-    head.className = 'yt-detail-head';
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'yt-detail-chip';
+    chip.title = 'Summary detail';
+    chip.setAttribute('aria-haspopup', 'dialog');
+    chip.setAttribute('aria-expanded', 'false');
+
+    const chipLabel = document.createElement('span');
+    chipLabel.className = 'yt-detail-chip-label';
+
+    const chipCaret = document.createElement('span');
+    chipCaret.className = 'yt-detail-chip-caret';
+    chipCaret.innerHTML = '<svg width="9" height="9" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>';
+
+    chip.appendChild(chipLabel);
+    chip.appendChild(chipCaret);
+    wrap.appendChild(chip);
+
+    // --- Popover (Effort-style slider), mounted on open ---
+    const pop = document.createElement('div');
+    pop.className = 'yt-detail-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Summary detail');
+    pop.hidden = true;
+    // Clicks inside the popover must not bubble to the header (which toggles the
+    // summary accordion) or to the document close-listener.
+    pop.addEventListener('click', (e) => e.stopPropagation());
+
+    // Title row: "Detail <value>" on the left, a "?" help toggle on the right.
+    const top = document.createElement('div');
+    top.className = 'yt-detail-top';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'yt-detail-title';
     const label = document.createElement('span');
     label.className = 'yt-detail-label';
     label.textContent = 'Detail';
     const value = document.createElement('span');
     value.className = 'yt-detail-value';
-    head.appendChild(label);
-    head.appendChild(value);
+    titleGroup.appendChild(label);
+    titleGroup.appendChild(value);
 
-    const row = document.createElement('div');
-    row.className = 'yt-detail-row';
+    const helpBtn = document.createElement('button');
+    helpBtn.type = 'button';
+    helpBtn.className = 'yt-detail-help-btn';
+    helpBtn.title = 'What does this level mean?';
+    helpBtn.setAttribute('aria-label', 'Explain this detail level');
+    helpBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
+    top.appendChild(titleGroup);
+    top.appendChild(helpBtn);
+
+    // End captions on their own row, above the track.
+    const caps = document.createElement('div');
+    caps.className = 'yt-detail-caps';
     const capLeft = document.createElement('span');
     capLeft.className = 'yt-detail-cap';
     capLeft.textContent = 'Quick';
-
     const capRight = document.createElement('span');
     capRight.className = 'yt-detail-cap';
     capRight.textContent = 'Thorough';
+    caps.appendChild(capLeft);
+    caps.appendChild(capRight);
 
-    const rail = document.createElement('div');
-    rail.className = 'yt-detail-rail';
-    rail.setAttribute('role', 'slider');
-    rail.setAttribute('tabindex', '0');
-    rail.setAttribute('aria-label', 'Summary detail');
-    rail.setAttribute('aria-valuemin', '0');
-    rail.setAttribute('aria-valuemax', String(lastIndex));
-
-    const fill = document.createElement('div');
-    fill.className = 'yt-detail-fill';
-    rail.appendChild(fill);
+    // Grooved track with evenly spaced dots and a lozenge thumb.
+    const track = document.createElement('div');
+    track.className = 'yt-detail-track';
+    track.setAttribute('role', 'slider');
+    track.setAttribute('tabindex', '0');
+    track.setAttribute('aria-label', 'Summary detail');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', String(lastIndex));
 
     const dots = DETAIL_OPTIONS.map((opt, i) => {
-        const dot = document.createElement('button');
-        dot.type = 'button';
+        const dot = document.createElement('span');
         dot.className = 'yt-detail-dot';
         dot.style.left = posLeft(fracOf(i));
-        dot.setAttribute('aria-label', opt.label);
-        dot.addEventListener('click', () => select(i));
-        rail.appendChild(dot);
+        track.appendChild(dot);
         return dot;
     });
 
     const thumb = document.createElement('div');
     thumb.className = 'yt-detail-thumb';
-    rail.appendChild(thumb);
+    track.appendChild(thumb);
 
-    row.appendChild(capLeft);
-    row.appendChild(rail);
-    row.appendChild(capRight);
-    control.appendChild(head);
-    control.appendChild(row);
+    // Longer per-level explanation, toggled by the "?" icon.
+    const help = document.createElement('div');
+    help.className = 'yt-detail-help';
+    help.hidden = true;
+
+    pop.appendChild(top);
+    pop.appendChild(caps);
+    pop.appendChild(track);
+    pop.appendChild(help);
 
     function render() {
-        const frac = fracOf(index);
-        thumb.style.left = posLeft(frac);
-        // Fill runs from the first stop to the thumb centre.
-        fill.style.width = `calc((100% - ${THUMB_W}px) * ${frac})`;
-        value.textContent = DETAIL_OPTIONS[index].label;
-        rail.setAttribute('aria-valuenow', String(index));
-        rail.setAttribute('aria-valuetext', DETAIL_OPTIONS[index].label);
-        dots.forEach((d, i) => d.classList.toggle('active', i <= index));
+        const opt = DETAIL_OPTIONS[index];
+        thumb.style.left = posLeft(fracOf(index));
+        chipLabel.textContent = opt.label;
+        value.textContent = opt.label;
+        help.textContent = opt.help;
+        track.setAttribute('aria-valuenow', String(index));
+        track.setAttribute('aria-valuetext', opt.label);
+        dots.forEach((d, i) => d.classList.toggle('active', i === index));
     }
 
-    function select(i, persist = true) {
+    function select(i) {
         const next = Math.min(lastIndex, Math.max(0, i));
         index = next;
         render();
-        if (persist) chrome.storage.local.set({ SUMMARY_LENGTH: DETAIL_OPTIONS[index].value });
+        // In-memory only — committed to SUMMARY_LENGTH when the user generates.
+        _pendingDetail = DETAIL_OPTIONS[index].value;
     }
 
-    rail.addEventListener('keydown', (e) => {
+    // Map a pointer x-position to the nearest level index.
+    function indexFromClientX(clientX) {
+        const rect = track.getBoundingClientRect();
+        const usable = rect.width - THUMB_W;
+        if (usable <= 0) return index;
+        let frac = (clientX - rect.left - THUMB_W / 2) / usable;
+        frac = Math.min(1, Math.max(0, frac));
+        return Math.round(frac * lastIndex);
+    }
+
+    track.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        select(indexFromClientX(e.clientX));
+    });
+    track.addEventListener('pointermove', (e) => {
+        if (dragging) select(indexFromClientX(e.clientX));
+    });
+    const endDrag = (e) => {
+        dragging = false;
+        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+
+    track.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); select(index - 1); }
         else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); select(index + 1); }
         else if (e.key === 'Home') { e.preventDefault(); select(0); }
         else if (e.key === 'End') { e.preventDefault(); select(lastIndex); }
     });
 
-    render();
-
-    // Sync to the persisted preference (no re-write) once storage resolves.
-    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
-        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
-        if (stored !== -1) select(stored, false);
+    helpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        helpOpen = !helpOpen;
+        help.hidden = !helpOpen;
+        helpBtn.classList.toggle('active', helpOpen);
     });
 
-    return control;
+    // --- Open / close the popover ---
+    const onDocClick = (e) => {
+        if (pop.contains(e.target) || chip.contains(e.target)) return;
+        closePop();
+    };
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); closePop(); chip.focus(); }
+    };
+
+    function openPop() {
+        const container = wrap.closest('.yt-timestamps-container');
+        if (!container) return;
+        container.appendChild(pop);
+        pop.hidden = false;
+
+        // Anchor the popover just below the chip, clamped inside the container so
+        // it never spills past the right edge.
+        const chipRect = chip.getBoundingClientRect();
+        const contRect = container.getBoundingClientRect();
+        const popW = pop.offsetWidth || 236;
+        let left = chipRect.left - contRect.left;
+        const maxLeft = contRect.width - popW - 8;
+        if (left > maxLeft) left = Math.max(8, maxLeft);
+        pop.style.left = `${left}px`;
+        pop.style.top = `${chipRect.bottom - contRect.top + 8}px`;
+
+        open = true;
+        chip.setAttribute('aria-expanded', 'true');
+        chip.classList.add('open');
+        track.focus();
+        // Defer so the opening click doesn't immediately close it.
+        setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+        document.addEventListener('keydown', onKeydown, true);
+    }
+
+    function closePop() {
+        open = false;
+        pop.hidden = true;
+        if (pop.parentElement) pop.parentElement.removeChild(pop);
+        chip.setAttribute('aria-expanded', 'false');
+        chip.classList.remove('open');
+        document.removeEventListener('click', onDocClick, true);
+        document.removeEventListener('keydown', onKeydown, true);
+    }
+
+    chip.addEventListener('click', (e) => {
+        // Don't let the click reach the header accordion toggle.
+        e.stopPropagation();
+        if (open) closePop(); else openPop();
+    });
+
+    render();
+
+    // Sync to the stored default (whatever the user last generated with) once
+    // storage resolves. This only updates the in-memory selection/display.
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
+        if (stored !== -1) select(stored);
+    });
+
+    return wrap;
+}
+
+// Build the static "Detail" badge for the generated-summary header: a read-only
+// pill that just reports which level produced the current summary. No popover —
+// changing the level happens in the empty state (via Reset).
+function buildDetailBadge() {
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-detail-chip-wrap';
+
+    const badge = document.createElement('span');
+    badge.className = 'yt-detail-chip yt-detail-chip-static';
+    badge.title = 'Detail level used for this summary';
+    badge.textContent = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].label;
+    wrap.appendChild(badge);
+
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+        const opt = DETAIL_OPTIONS.find((o) => o.value === res.SUMMARY_LENGTH);
+        if (opt) badge.textContent = opt.label;
+    });
+
+    return wrap;
 }
 
 // Gear (settings) icon markup, shared by the empty-state header.
@@ -333,8 +498,9 @@ function renderEmptyState(container) {
         chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" });
     };
 
-    // Append elements
+    // Append elements (title + Detail chip on the left, gear on the right)
     headerLeft.appendChild(headerTitle);
+    headerLeft.appendChild(buildDetailChip());
     panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
@@ -355,10 +521,6 @@ function renderEmptyState(container) {
         <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
     `;
     panelBody.appendChild(emptyState);
-
-    // Per-video "Detail" control (density + depth). Lives in the empty state; the
-    // whole body is rebuilt on summary render, so it clears itself afterward.
-    panelBody.appendChild(buildDetailSlider());
 
     // Create action area element
     const actionArea = document.createElement('div');
@@ -485,7 +647,7 @@ function runAnalysis() {
     updateGenerateButton('extracting');
 
     // Send analysis request with timeout. Model is a global preference (settings
-    // page); length is the per-video "Detail" preset chosen in the panel.
+    // page); length is the "Detail" preset currently selected in the panel chip.
     const sendAnalysis = (model, length, timeout = 120000) => {
         return new Promise((resolve) => {
             let resolved = false;
@@ -520,7 +682,11 @@ function runAnalysis() {
                 chrome.storage.local.get(['SELECTED_MODEL', 'SUMMARY_LENGTH'], resolve)
             );
             const model = prefs.SELECTED_MODEL || 'auto';
-            const length = prefs.SUMMARY_LENGTH || 'standard';
+            // Use the level selected in the chip; fall back to the stored default.
+            const length = _pendingDetail || prefs.SUMMARY_LENGTH || 'standard';
+            // Generating commits this level as the new sticky default, so the next
+            // video (and this summary's header badge) opens on it.
+            chrome.storage.local.set({ SUMMARY_LENGTH: length });
 
             const result = await sendAnalysis(model, length);
 
@@ -662,6 +828,7 @@ function renderTimestampsUI(summaryText) {
     });
 
     headerLeft.appendChild(headerTitle);
+    headerLeft.appendChild(buildDetailBadge());
     headerLeft.appendChild(resetBtn);
 
     const toggleIcon = document.createElement('span');
