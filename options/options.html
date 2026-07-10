@@ -842,6 +842,161 @@
       color: #a1a1aa;
     }
 
+    /* About & help: delight stat cards */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stat-card {
+      flex: 1;
+      min-width: 0;
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #fafafa;
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 12.5px;
+      color: #71717a;
+      margin-top: 6px;
+    }
+
+    /* Info button + hover/focus tooltip */
+    .info-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      color: #52525b;
+      transition: color 0.2s ease;
+      outline: none;
+    }
+
+    .info-btn:hover,
+    .info-btn:focus-visible { color: #a1a1aa; }
+
+    .info-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+      display: block;
+    }
+
+    .info-tip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      width: 220px;
+      background: #27272a;
+      color: #d4d4d8;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 50;
+    }
+
+    .info-btn:hover .info-tip,
+    .info-btn:focus-visible .info-tip,
+    .info-btn:focus-within .info-tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* About/help info rows */
+    .about-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .about-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .about-row-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #71717a;
+    }
+
+    .about-row-value {
+      font-size: 12.5px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    /* "Developed with love" block */
+    .made-by {
+      text-align: center;
+      padding: 24px 20px;
+    }
+
+    .made-by-line {
+      font-size: 15px;
+      font-weight: 500;
+      color: #fafafa;
+    }
+
+    .made-by-line .heart {
+      color: #ef4444;
+      font-style: normal;
+    }
+
+    .made-by-sub {
+      font-size: 12.5px;
+      color: #71717a;
+      margin-top: 6px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .contact-link {
+      display: inline-block;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #fafafa;
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .contact-link:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
     /* Narrow viewports: collapse sidebar to a top bar */
     @media (max-width: 640px) {
       body { padding: 20px 12px 48px; }
@@ -857,6 +1012,7 @@
       .nav-item.active::before { display: none; }
       .sidebar-foot { display: none; }
       .content { padding: 22px 18px 26px; }
+      .stats-row { flex-direction: column; }
     }
   </style>
 </head>
@@ -879,6 +1035,14 @@
         <button class="nav-item" data-pane="appearance" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
           Appearance
+        </button>
+        <button class="nav-item" data-pane="stats" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24"><path d="M4 9h4v11H4V9zm6-5h4v16h-4V4zm6 8h4v8h-4v-8z"/></svg>
+          Statistics
+        </button>
+        <button class="nav-item" data-pane="about" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          About &amp; help
         </button>
       </nav>
       <div class="sidebar-foot">YouTube Transcript Extractor v1.2</div>
@@ -1058,6 +1222,71 @@
             <button class="segmented-option" data-theme="system" role="radio" aria-checked="true">System</button>
             <button class="segmented-option" data-theme="light" role="radio" aria-checked="false">Light</button>
             <button class="segmented-option" data-theme="dark" role="radio" aria-checked="false">Dark</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Statistics pane -->
+      <section class="pane" id="pane-stats" role="tabpanel">
+        <div class="pane-head">
+          <div class="pane-title">Statistics</div>
+          <div class="pane-sub">Your impact so far.</div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-summaries">0</div>
+            <div class="stat-label">Summaries generated</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-time-saved">0m</div>
+            <div class="stat-label">
+              Est. time saved
+              <span class="info-btn" tabindex="0" role="button" aria-label="How time saved is calculated">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <span class="info-tip" role="tooltip">Estimated as the video's length minus the time to read your summary (about 200 words a minute), so it never drops below zero.</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- About & help pane -->
+      <section class="pane" id="pane-about" role="tabpanel">
+        <div class="pane-head">
+          <div class="pane-title">About &amp; help</div>
+          <div class="pane-sub">What this extension does, and how to reach me.</div>
+        </div>
+
+        <div class="setting-section about-list">
+          <div class="about-row">
+            <span class="about-row-label">What it is</span>
+            <span class="about-row-value">A summarizer for YouTube. On any video that has captions, it adds a panel that turns the transcript into a clean, timestamped summary — so you can read the gist in a minute or jump straight to the part you care about.</span>
+          </div>
+          <div class="about-row">
+            <span class="about-row-label">How it works</span>
+            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Google Gemini or Mistral, using your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
+          </div>
+          <div class="about-row">
+            <span class="about-row-label">Detail &amp; theme</span>
+            <span class="about-row-value">Dial each summary from a quick skim to a thorough breakdown with the Detail control in the panel header. The panel follows YouTube's light or dark theme on its own — override it any time under Appearance.</span>
+          </div>
+          <div class="about-row">
+            <span class="about-row-label">Privacy</span>
+            <span class="about-row-value">Your API keys and stats live only in your browser's local storage, never on a server of mine. Transcripts are sent only to the provider you choose, and nowhere else.</span>
+          </div>
+        </div>
+
+        <div class="setting-section made-by">
+          <div class="made-by-line">Developed with <span class="heart">&hearts;</span> by Priyank</div>
+          <div class="made-by-sub">Feedback, a question, or a bug to report? I'd genuinely love to hear from you.</div>
+          <a class="contact-link" href="mailto:hello@priyank.design">hello@priyank.design</a>
+        </div>
+
+        <div class="setting-section about-list">
+          <div class="about-row">
+            <span class="about-row-label">Version</span>
+            <span class="about-row-value">YouTube Transcript Extractor v1.2</span>
           </div>
         </div>
       </section>

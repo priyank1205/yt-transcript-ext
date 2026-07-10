@@ -148,6 +148,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- About & help (delight stats) ---
+  // Read-only display of persisted counters written by the background worker on
+  // each successful generation. Paints once on load.
+  const statSummaries = document.getElementById('stat-summaries');
+  const statTimeSaved = document.getElementById('stat-time-saved');
+  if (statSummaries && statTimeSaved) {
+    chrome.storage.local.get(['SUMMARIES_COUNT', 'SECONDS_SAVED'], (res) => {
+      statSummaries.textContent = String(res.SUMMARIES_COUNT || 0);
+      statTimeSaved.textContent = formatDuration(res.SECONDS_SAVED || 0);
+    });
+  }
+
+  // Seconds -> compact human label: "0m", "<1m", "Xm", or "Xh Ym" (drops "0m").
+  function formatDuration(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    if (s === 0) return '0m';
+    if (s < 60) return '<1m';
+    const totalMin = Math.floor(s / 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h === 0) return `${m}m`;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  }
+
   // Toggle password visibility
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     btn.addEventListener('click', () => {
