@@ -21,64 +21,174 @@
       overflow-x: hidden;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
+      padding: 44px 20px 60px;
     }
 
     /* Ambient glow */
     body::before {
       content: '';
       position: fixed;
-      top: -120px;
+      top: -140px;
       left: 50%;
       transform: translateX(-50%);
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(255, 0, 0, 0.08) 0%, transparent 70%);
+      width: 420px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(255, 0, 0, 0.07) 0%, transparent 70%);
       pointer-events: none;
       z-index: 0;
     }
 
-    .container {
+    /* App shell: sidebar + content */
+    .app {
       width: 100%;
-      max-width: 420px;
-      padding: 28px 24px 20px;
+      max-width: 800px;
+      display: flex;
+      background: #0d0d0f;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      overflow: hidden;
       position: relative;
       z-index: 1;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+      animation: appIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    /* Header */
-    .header {
-      text-align: center;
-      margin-bottom: 28px;
+    @keyframes appIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .header-icon {
-      width: 48px;
-      height: 48px;
-      margin: 0 auto 14px;
-      border-radius: 14px;
-      overflow: hidden;
-      animation: iconFloat 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    /* Sidebar */
+    .sidebar {
+      width: 208px;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
     }
 
-    @keyframes iconFloat {
-      from { opacity: 0; transform: scale(0.8) translateY(8px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px 20px;
     }
 
-    .header h1 {
-      font-size: 18px;
+    .brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .brand-name {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #fafafa;
+      line-height: 1.2;
+    }
+
+    .brand-ver {
+      font-size: 11px;
+      color: #52525b;
+      margin-top: 1px;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: #a1a1aa;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: #fafafa;
+    }
+
+    .nav-item.active {
+      background: rgba(255, 255, 255, 0.07);
+      color: #fafafa;
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 16px;
+      border-radius: 0 3px 3px 0;
+      background: #ef4444;
+    }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding: 14px 8px 2px;
+      font-size: 11px;
+      color: #3f3f46;
+      letter-spacing: 0.02em;
+    }
+
+    /* Content */
+    .content {
+      flex: 1;
+      min-width: 0;
+      padding: 28px 30px 32px;
+    }
+
+    .pane { display: none; }
+
+    .pane.active {
+      display: block;
+      animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .pane-head {
+      margin-bottom: 20px;
+    }
+
+    .pane-title {
+      font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.02em;
       color: #fafafa;
-      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
     }
 
-    .header p {
-      font-size: 13px;
+    .pane-sub {
+      font-size: 12.5px;
       color: #71717a;
-      margin-top: 4px;
-      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+      margin-top: 3px;
     }
 
     @keyframes fadeUp {
@@ -101,15 +211,6 @@
       position: relative;
       overflow: hidden;
       transition: border-color 0.3s ease, box-shadow 0.3s ease;
-      animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-
-    .model-card:nth-child(1) { animation-delay: 0.15s; }
-    .model-card:nth-child(2) { animation-delay: 0.25s; }
-
-    @keyframes cardIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
     }
 
     .model-card:hover {
@@ -337,29 +438,6 @@
       fill: currentColor;
     }
 
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding-top: 8px;
-      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
-    }
-
-    .footer p {
-      font-size: 11px;
-      color: #3f3f46;
-      letter-spacing: 0.02em;
-    }
-
-    .footer a {
-      color: #52525b;
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .footer a:hover {
-      color: #a1a1aa;
-    }
-
     /* Toast notification */
     .toast {
       position: fixed;
@@ -405,7 +483,6 @@
       padding: 12px 14px;
       margin-bottom: 16px;
       transition: border-color 0.3s ease;
-      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
     }
 
     .info-banner.ready {
@@ -639,18 +716,54 @@
       fill: currentColor;
     }
 
+    /* Add-provider (deactivated, future) */
+    .add-provider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 13px 16px;
+      margin-bottom: 4px;
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      color: #52525b;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      text-align: left;
+      cursor: not-allowed;
+    }
+
+    .add-provider svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+
+    .add-provider .coming-soon {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #71717a;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
     /* Privacy note */
     .privacy-note {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 6px;
       font-size: 11px;
       color: #52525b;
-      margin: 2px 0 12px;
+      margin: 16px 2px 0;
       line-height: 1.4;
-      text-align: center;
-      animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
     }
 
     .privacy-note svg {
@@ -660,21 +773,20 @@
       flex-shrink: 0;
     }
 
-    /* Appearance section */
-    .appearance-section {
+    /* Settings section (model picker, theme) */
+    .setting-section {
       background: #18181b;
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 14px;
       padding: 16px 20px;
       margin-bottom: 12px;
-      animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
     }
 
-    .appearance-header {
+    .setting-header {
       margin-bottom: 12px;
     }
 
-    .appearance-title {
+    .setting-title {
       display: block;
       font-size: 14px;
       font-weight: 600;
@@ -682,7 +794,7 @@
       letter-spacing: -0.01em;
     }
 
-    .appearance-sub {
+    .setting-sub {
       display: block;
       font-size: 12px;
       color: #52525b;
@@ -729,177 +841,227 @@
     .segmented-option:disabled:hover {
       color: #a1a1aa;
     }
+
+    /* Narrow viewports: collapse sidebar to a top bar */
+    @media (max-width: 640px) {
+      body { padding: 20px 12px 48px; }
+      .app { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 16px 12px;
+      }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .nav-item { width: auto; }
+      .nav-item.active::before { display: none; }
+      .sidebar-foot { display: none; }
+      .content { padding: 22px 18px 26px; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-icon">
-        <img src="../icons/icon128.png" alt="Extension icon" style="width: 48px; height: 48px; border-radius: 14px;">
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../icons/icon128.png" alt="Extension icon">
+        <div>
+          <div class="brand-name">Transcript Extractor</div>
+          <div class="brand-ver">Settings</div>
+        </div>
       </div>
-      <h1>Transcript Extractor</h1>
-      <p>Configure your AI model API keys</p>
-    </div>
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-pane="providers" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+          AI providers
+        </button>
+        <button class="nav-item" data-pane="appearance" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+          Appearance
+        </button>
+      </nav>
+      <div class="sidebar-foot">YouTube Transcript Extractor v1.2</div>
+    </aside>
 
-    <div class="info-banner" id="intro-banner">
-      <span class="banner-icon" id="banner-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-      </span>
-      <p id="intro-banner-text">Add an API key from <strong>either provider</strong> below to start generating summaries — both offer a free tier.</p>
-    </div>
-
-    <div class="cards">
-      <!-- Gemini Card -->
-      <div class="model-card">
-        <div class="card-header">
-          <div class="model-icon gemini">
-            <svg viewBox="0 0 24 24"><path d="M12 2c.774 0 .949.711 1.173 1.292c.15.387.367.922.639 1.51c.559 1.21 1.294 2.526 2.077 3.31c.783.782 2.1 1.518 3.308 2.076c.589.272 1.124.49 1.511.64c.567.218 1.292.43 1.292 1.172c0 .774-.711.949-1.292 1.173c-.387.15-.922.367-1.51.639c-1.21.559-2.526 1.294-3.31 2.077c-.782.783-1.517 2.1-2.076 3.308a27 27 0 0 0-.64 1.511C12.95 21.286 12.769 22 12 22c-.761 0-.951-.718-1.173-1.292a26 26 0 0 0-.639-1.51c-.558-1.21-1.294-2.526-2.077-3.31c-.783-.782-2.1-1.517-3.308-2.076a26 26 0 0 0-1.511-.64C2.712 12.95 2 12.774 2 12s.711-.949 1.292-1.173c.387-.15.922-.367 1.51-.639c1.21-.558 2.526-1.294 3.31-2.077c.782-.783 1.518-2.1 2.076-3.308c.272-.589.49-1.124.64-1.511C11.047 2.719 11.235 2 12 2"/></svg>
-          </div>
-          <div class="model-info">
-            <div class="model-name">Google Gemini</div>
-            <div class="model-desc">Advanced reasoning & analysis</div>
-          </div>
-          <span class="status-badge not-configured" id="gemini-status">Not set</span>
+    <!-- Content -->
+    <main class="content">
+      <!-- AI providers pane -->
+      <section class="pane active" id="pane-providers" role="tabpanel">
+        <div class="pane-head">
+          <div class="pane-title">AI providers</div>
+          <div class="pane-sub">Connect the AI services that write your summaries.</div>
         </div>
-        <div class="input-group">
-          <label for="gemini-api-key">API Key</label>
-          <div class="input-wrapper">
-            <input type="password" id="gemini-api-key" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false">
-            <button class="toggle-visibility" data-target="gemini-api-key" title="Toggle visibility">
-              <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-              <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+
+        <div class="info-banner" id="intro-banner">
+          <span class="banner-icon" id="banner-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          </span>
+          <p id="intro-banner-text">Add an API key from <strong>either provider</strong> below to start generating summaries — both offer a free tier.</p>
+        </div>
+
+        <div class="setting-section">
+          <div class="setting-header">
+            <span class="setting-title">Summaries written by</span>
+            <span class="setting-sub">Which AI generates your summaries — Auto tries Gemini first, then Mistral</span>
+          </div>
+          <div class="segmented" id="model-segmented" role="radiogroup" aria-label="Model provider">
+            <button class="segmented-option" data-model="auto" role="radio" aria-checked="true">Auto</button>
+            <button class="segmented-option" data-model="gemini" role="radio" aria-checked="false">Gemini</button>
+            <button class="segmented-option" data-model="mistral" role="radio" aria-checked="false">Mistral</button>
+          </div>
+        </div>
+
+        <!-- Gemini Card -->
+        <div class="model-card">
+          <div class="card-header">
+            <div class="model-icon gemini">
+              <svg viewBox="0 0 24 24"><path d="M12 2c.774 0 .949.711 1.173 1.292c.15.387.367.922.639 1.51c.559 1.21 1.294 2.526 2.077 3.31c.783.782 2.1 1.518 3.308 2.076c.589.272 1.124.49 1.511.64c.567.218 1.292.43 1.292 1.172c0 .774-.711.949-1.292 1.173c-.387.15-.922.367-1.51.639c-1.21.559-2.526 1.294-3.31 2.077c-.782.783-1.517 2.1-2.076 3.308a27 27 0 0 0-.64 1.511C12.95 21.286 12.769 22 12 22c-.761 0-.951-.718-1.173-1.292a26 26 0 0 0-.639-1.51c-.558-1.21-1.294-2.526-2.077-3.31c-.783-.782-2.1-1.517-3.308-2.076a26 26 0 0 0-1.511-.64C2.712 12.95 2 12.774 2 12s.711-.949 1.292-1.173c.387-.15.922-.367 1.51-.639c1.21-.558 2.526-1.294 3.31-2.077c.782-.783 1.518-2.1 2.076-3.308c.272-.589.49-1.124.64-1.511C11.047 2.719 11.235 2 12 2"/></svg>
+            </div>
+            <div class="model-info">
+              <div class="model-name">Google Gemini</div>
+              <div class="model-desc">Advanced reasoning & analysis</div>
+            </div>
+            <span class="status-badge not-configured" id="gemini-status">Not set</span>
+          </div>
+          <div class="input-group">
+            <label for="gemini-api-key">API Key</label>
+            <div class="input-wrapper">
+              <input type="password" id="gemini-api-key" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false">
+              <button class="toggle-visibility" data-target="gemini-api-key" title="Toggle visibility">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="key-hint" id="gemini-key-hint" hidden></div>
+          <div class="action-row">
+            <button class="save-btn" id="save-gemini-key">
+              <span class="btn-content">
+                <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+                Save
+              </span>
             </button>
+            <button class="remove-btn" id="remove-gemini-key" hidden>Remove</button>
           </div>
-        </div>
-        <div class="key-hint" id="gemini-key-hint" hidden></div>
-        <div class="action-row">
-          <button class="save-btn" id="save-gemini-key">
-            <span class="btn-content">
-              <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-              Save
-            </span>
-          </button>
-          <button class="remove-btn" id="remove-gemini-key" hidden>Remove</button>
-        </div>
-        <div class="help">
-          <button class="help-toggle" id="gemini-help-toggle" aria-expanded="false" aria-controls="gemini-help">
-            <span class="help-toggle-label">
-              <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-              How to get your Gemini API key
-            </span>
-            <span class="free-badge">Free</span>
-            <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
-          </button>
-          <div class="help-body" id="gemini-help">
-            <div class="help-body-inner">
-              <ol class="help-steps">
-                <li>Open <strong>Google AI Studio</strong> and sign in with your Google account.</li>
-                <li>Click <strong>Create API key</strong> (top right).</li>
-                <li>Copy the key that's generated.</li>
-                <li>Paste it in the field above and click <strong>Save</strong>.</li>
-              </ol>
-              <p class="help-note">Gemini has a free tier — no billing setup needed to start.</p>
-              <a class="get-key-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
-                Get API key
-                <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
-              </a>
+          <div class="help">
+            <button class="help-toggle" id="gemini-help-toggle" aria-expanded="false" aria-controls="gemini-help">
+              <span class="help-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                How to get your Gemini API key
+              </span>
+              <span class="free-badge">Free</span>
+              <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+            </button>
+            <div class="help-body" id="gemini-help">
+              <div class="help-body-inner">
+                <ol class="help-steps">
+                  <li>Open <strong>Google AI Studio</strong> and sign in with your Google account.</li>
+                  <li>Click <strong>Create API key</strong> (top right).</li>
+                  <li>Copy the key that's generated.</li>
+                  <li>Paste it in the field above and click <strong>Save</strong>.</li>
+                </ol>
+                <p class="help-note">Gemini has a free tier — no billing setup needed to start.</p>
+                <a class="get-key-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                  Get API key
+                  <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Mistral Card -->
-      <div class="model-card">
-        <div class="card-header">
-          <div class="model-icon mistral">
-            <svg viewBox="0 0 256 233"><path d="M186.182 0h46.545v46.545h-46.545z"/><path fill="#f7d046" d="M209.455 0H256v46.545h-46.545z"/><path d="M0 0h46.545v46.545H0zm0 46.545h46.545V93.09H0zm0 46.546h46.545v46.545H0zm0 46.545h46.545v46.545H0zm0 46.546h46.545v46.545H0z"/><path fill="#f7d046" d="M23.273 0h46.545v46.545H23.273z"/><path fill="#f2a73b" d="M209.455 46.545H256V93.09h-46.545zm-186.182 0h46.545V93.09H23.273z"/><path d="M139.636 46.545h46.545V93.09h-46.545z"/><path fill="#f2a73b" d="M162.909 46.545h46.545V93.09h-46.545zm-93.091 0h46.545V93.09H69.818z"/><path fill="#ee792f" d="M116.364 93.091h46.545v46.545h-46.545zm46.545 0h46.545v46.545h-46.545zm-93.091 0h46.545v46.545H69.818z"/><path d="M93.091 139.636h46.545v46.545H93.091z"/><path fill="#eb5829" d="M116.364 139.636h46.545v46.545h-46.545z"/><path fill="#ee792f" d="M209.455 93.091H256v46.545h-46.545zm-186.182 0h46.545v46.545H23.273z"/><path d="M186.182 139.636h46.545v46.545h-46.545z"/><path fill="#eb5829" d="M209.455 139.636H256v46.545h-46.545z"/><path d="M186.182 186.182h46.545v46.545h-46.545z"/><path fill="#eb5829" d="M23.273 139.636h46.545v46.545H23.273z"/><path fill="#ea3326" d="M209.455 186.182H256v46.545h-46.545zm-186.182 0h46.545v46.545H23.273z"/></svg>
+        <!-- Mistral Card -->
+        <div class="model-card">
+          <div class="card-header">
+            <div class="model-icon mistral">
+              <svg viewBox="0 0 256 233"><path d="M186.182 0h46.545v46.545h-46.545z"/><path fill="#f7d046" d="M209.455 0H256v46.545h-46.545z"/><path d="M0 0h46.545v46.545H0zm0 46.545h46.545V93.09H0zm0 46.546h46.545v46.545H0zm0 46.545h46.545v46.545H0zm0 46.546h46.545v46.545H0z"/><path fill="#f7d046" d="M23.273 0h46.545v46.545H23.273z"/><path fill="#f2a73b" d="M209.455 46.545H256V93.09h-46.545zm-186.182 0h46.545V93.09H23.273z"/><path d="M139.636 46.545h46.545V93.09h-46.545z"/><path fill="#f2a73b" d="M162.909 46.545h46.545V93.09h-46.545zm-93.091 0h46.545V93.09H69.818z"/><path fill="#ee792f" d="M116.364 93.091h46.545v46.545h-46.545zm46.545 0h46.545v46.545h-46.545zm-93.091 0h46.545v46.545H69.818z"/><path d="M93.091 139.636h46.545v46.545H93.091z"/><path fill="#eb5829" d="M116.364 139.636h46.545v46.545h-46.545z"/><path fill="#ee792f" d="M209.455 93.091H256v46.545h-46.545zm-186.182 0h46.545v46.545H23.273z"/><path d="M186.182 139.636h46.545v46.545h-46.545z"/><path fill="#eb5829" d="M209.455 139.636H256v46.545h-46.545z"/><path d="M186.182 186.182h46.545v46.545h-46.545z"/><path fill="#eb5829" d="M23.273 139.636h46.545v46.545H23.273z"/><path fill="#ea3326" d="M209.455 186.182H256v46.545h-46.545zm-186.182 0h46.545v46.545H23.273z"/></svg>
+            </div>
+            <div class="model-info">
+              <div class="model-name">Mistral AI</div>
+              <div class="model-desc">Fast & efficient transcripts</div>
+            </div>
+            <span class="status-badge not-configured" id="mistral-status">Not set</span>
           </div>
-          <div class="model-info">
-            <div class="model-name">Mistral AI</div>
-            <div class="model-desc">Fast & efficient transcripts</div>
+          <div class="input-group">
+            <label for="mistral-api-key">API Key</label>
+            <div class="input-wrapper">
+              <input type="password" id="mistral-api-key" placeholder="Paste your Mistral API key" autocomplete="off" spellcheck="false">
+              <button class="toggle-visibility" data-target="mistral-api-key" title="Toggle visibility">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+              </button>
+            </div>
           </div>
-          <span class="status-badge not-configured" id="mistral-status">Not set</span>
-        </div>
-        <div class="input-group">
-          <label for="mistral-api-key">API Key</label>
-          <div class="input-wrapper">
-            <input type="password" id="mistral-api-key" placeholder="Paste your Mistral API key" autocomplete="off" spellcheck="false">
-            <button class="toggle-visibility" data-target="mistral-api-key" title="Toggle visibility">
-              <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-              <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+          <div class="key-hint" id="mistral-key-hint" hidden></div>
+          <div class="action-row">
+            <button class="save-btn" id="save-mistral-key">
+              <span class="btn-content">
+                <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+                Save
+              </span>
             </button>
+            <button class="remove-btn" id="remove-mistral-key" hidden>Remove</button>
           </div>
-        </div>
-        <div class="key-hint" id="mistral-key-hint" hidden></div>
-        <div class="action-row">
-          <button class="save-btn" id="save-mistral-key">
-            <span class="btn-content">
-              <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-              Save
-            </span>
-          </button>
-          <button class="remove-btn" id="remove-mistral-key" hidden>Remove</button>
-        </div>
-        <div class="help">
-          <button class="help-toggle" id="mistral-help-toggle" aria-expanded="false" aria-controls="mistral-help">
-            <span class="help-toggle-label">
-              <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-              How to get your Mistral API key
-            </span>
-            <span class="free-badge">Free</span>
-            <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
-          </button>
-          <div class="help-body" id="mistral-help">
-            <div class="help-body-inner">
-              <ol class="help-steps">
-                <li>Open the <strong>Mistral Console</strong> and sign up or log in.</li>
-                <li>Open <strong>API Keys</strong> in the sidebar.</li>
-                <li>Click <strong>Create new key</strong> and copy it. You may need to verify a phone number and activate the free "Experiment" plan first.</li>
-                <li>Paste it in the field above and click <strong>Save</strong>.</li>
-              </ol>
-              <p class="help-note">Mistral's free Experiment tier works here (phone verification required).</p>
-              <a class="get-key-btn" href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer">
-                Get API key
-                <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
-              </a>
+          <div class="help">
+            <button class="help-toggle" id="mistral-help-toggle" aria-expanded="false" aria-controls="mistral-help">
+              <span class="help-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                How to get your Mistral API key
+              </span>
+              <span class="free-badge">Free</span>
+              <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+            </button>
+            <div class="help-body" id="mistral-help">
+              <div class="help-body-inner">
+                <ol class="help-steps">
+                  <li>Open the <strong>Mistral Console</strong> and sign up or log in.</li>
+                  <li>Open <strong>API Keys</strong> in the sidebar.</li>
+                  <li>Click <strong>Create new key</strong> and copy it. You may need to verify a phone number and activate the free "Experiment" plan first.</li>
+                  <li>Paste it in the field above and click <strong>Save</strong>.</li>
+                </ol>
+                <p class="help-note">Mistral's free Experiment tier works here (phone verification required).</p>
+                <a class="get-key-btn" href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer">
+                  Get API key
+                  <svg viewBox="0 0 24 24"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7zM19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="appearance-section">
-      <div class="appearance-header">
-        <span class="appearance-title">Model provider</span>
-        <span class="appearance-sub">Which AI writes your summaries — Auto tries Gemini first, then Mistral</span>
-      </div>
-      <div class="segmented" id="model-segmented" role="radiogroup" aria-label="Model provider">
-        <button class="segmented-option" data-model="auto" role="radio" aria-checked="true">Auto</button>
-        <button class="segmented-option" data-model="gemini" role="radio" aria-checked="false">Gemini</button>
-        <button class="segmented-option" data-model="mistral" role="radio" aria-checked="false">Mistral</button>
-      </div>
-    </div>
+        <button class="add-provider" disabled aria-disabled="true">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Add provider
+          <span class="coming-soon">Coming soon</span>
+        </button>
 
-    <div class="appearance-section">
-      <div class="appearance-header">
-        <span class="appearance-title">Panel appearance</span>
-        <span class="appearance-sub">How the summary panel matches YouTube's theme</span>
-      </div>
-      <div class="segmented" id="theme-segmented" role="radiogroup" aria-label="Panel appearance">
-        <button class="segmented-option" data-theme="system" role="radio" aria-checked="true">System</button>
-        <button class="segmented-option" data-theme="light" role="radio" aria-checked="false">Light</button>
-        <button class="segmented-option" data-theme="dark" role="radio" aria-checked="false">Dark</button>
-      </div>
-    </div>
+        <p class="privacy-note">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          Keys are stored locally in your browser and only sent to the provider's API.
+        </p>
+      </section>
 
-    <p class="privacy-note">
-      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-      Keys are stored locally in your browser and only sent to the provider's API.
-    </p>
+      <!-- Appearance pane -->
+      <section class="pane" id="pane-appearance" role="tabpanel">
+        <div class="pane-head">
+          <div class="pane-title">Appearance</div>
+          <div class="pane-sub">How the summary panel fits into YouTube.</div>
+        </div>
 
-    <div class="footer">
-      <p>YouTube Transcript Extractor v1.2</p>
-    </div>
+        <div class="setting-section">
+          <div class="setting-header">
+            <span class="setting-title">Panel theme</span>
+            <span class="setting-sub">System follows YouTube's current theme automatically</span>
+          </div>
+          <div class="segmented" id="theme-segmented" role="radiogroup" aria-label="Panel appearance">
+            <button class="segmented-option" data-theme="system" role="radio" aria-checked="true">System</button>
+            <button class="segmented-option" data-theme="light" role="radio" aria-checked="false">Light</button>
+            <button class="segmented-option" data-theme="dark" role="radio" aria-checked="false">Dark</button>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
   <div class="toast" id="toast">

@@ -52,6 +52,19 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   };
 
+  // --- Sidebar navigation (switch content panes) ---
+  const navItems = Array.from(document.querySelectorAll('.nav-item'));
+  const panes = Array.from(document.querySelectorAll('.pane'));
+  function showPane(name) {
+    navItems.forEach((n) => {
+      const on = n.dataset.pane === name;
+      n.classList.toggle('active', on);
+      n.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    panes.forEach((p) => p.classList.toggle('active', p.id === `pane-${name}`));
+  }
+  navItems.forEach((n) => n.addEventListener('click', () => showPane(n.dataset.pane)));
+
   const configured = { gemini: false, mistral: false };
 
   // Load saved keys and paint each card's state
