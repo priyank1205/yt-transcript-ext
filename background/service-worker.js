@@ -44,6 +44,25 @@ function parseDurationMinutes(transcript) {
   return seconds > 0 ? seconds / 60 : null;
 }
 
+// Delight stat: record one successful summary and the estimated watch-time it
+// saved. "Saved" = the video's length minus the time to read the summary at
+// READING_WPM, clamped at zero (a summary can't cost more than the video). When
+// the duration couldn't be parsed we still count the summary but add 0 seconds.
+// Fire-and-forget so it never delays the response to the panel.
+const READING_WPM = 200;
+function recordSummaryStat(summary, durationMinutes) {
+  const words = (summary || '').trim().split(/\s+/).filter(Boolean).length;
+  const readMinutes = words / READING_WPM;
+  const savedMinutes = durationMinutes ? Math.max(0, durationMinutes - readMinutes) : 0;
+  const savedSeconds = Math.round(savedMinutes * 60);
+  chrome.storage.local.get(['SUMMARIES_COUNT', 'SECONDS_SAVED'], (res) => {
+    chrome.storage.local.set({
+      SUMMARIES_COUNT: (res.SUMMARIES_COUNT || 0) + 1,
+      SECONDS_SAVED: (res.SECONDS_SAVED || 0) + savedSeconds,
+    });
+  });
+}
+
 // Helper: create LLM client by model name
 function getClient(modelName) {
   switch (modelName.toLowerCase()) {
@@ -206,7 +225,10 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) 
     }
     
     console.log('API call completed successfully, summary length:', summary?.length);
-    
+
+    // Count this successful generation + accumulate estimated time saved.
+    recordSummaryStat(summary, summaryOptions.durationMinutes);
+
     // 7. Send timestamps to content script to render
     console.log('Sending RENDER_TIMESTAMPS');
     await sendTabMessage(tab.id, { action: "RENDER_TIMESTAMPS", data: summary });
