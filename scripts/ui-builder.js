@@ -176,15 +176,137 @@ function disconnectPlayerObserver() {
     _lastAppliedHeight = 0;
 }
 
-// Function to inject sidebar into the DOM
-function injectSidebar(secondary) {
-    if (document.querySelector('.yt-timestamps-container')) return;
+// The per-video "Detail" presets, ordered from least to most detail. `value` is
+// what we persist (SUMMARY_LENGTH) and send to the backend; `label` is shown to
+// the user. Middle (Standard) is the smart default.
+const DETAIL_OPTIONS = [
+    { value: 'brief', label: 'Brief' },
+    { value: 'standard', label: 'Standard' },
+    { value: 'detailed', label: 'In-depth' }
+];
+const DETAIL_DEFAULT_INDEX = 1;
 
-    // Create container element
-    const container = document.createElement('div');
-    container.className = 'yt-timestamps-container';
-    // Apply the theme up-front (follows YouTube by default) to avoid a flash
-    applyPanelTheme('system', container);
+// Build the "Detail" slider: an Effort-style track (title + current value,
+// Quick↔Thorough end caps, three dots + a thumb). Selecting a level persists
+// SUMMARY_LENGTH; the picked level is read back at generate time. The control is
+// created with the default selected, then synced to the stored preference async.
+function buildDetailSlider() {
+    let index = DETAIL_DEFAULT_INDEX;
+    const lastIndex = DETAIL_OPTIONS.length - 1;
+
+    // Thumb width (must match CSS). Positions are inset by half the thumb so the
+    // end stops and the thumb sit fully inside the rail instead of clipping.
+    const THUMB_W = 22;
+    const posLeft = (frac) => `calc(${THUMB_W / 2}px + (100% - ${THUMB_W}px) * ${frac})`;
+    const fracOf = (i) => (lastIndex ? i / lastIndex : 0);
+
+    const control = document.createElement('div');
+    control.className = 'yt-detail-control';
+
+    const head = document.createElement('div');
+    head.className = 'yt-detail-head';
+    const label = document.createElement('span');
+    label.className = 'yt-detail-label';
+    label.textContent = 'Detail';
+    const value = document.createElement('span');
+    value.className = 'yt-detail-value';
+    head.appendChild(label);
+    head.appendChild(value);
+
+    const row = document.createElement('div');
+    row.className = 'yt-detail-row';
+
+    const capLeft = document.createElement('span');
+    capLeft.className = 'yt-detail-cap';
+    capLeft.textContent = 'Quick';
+
+    const capRight = document.createElement('span');
+    capRight.className = 'yt-detail-cap';
+    capRight.textContent = 'Thorough';
+
+    const rail = document.createElement('div');
+    rail.className = 'yt-detail-rail';
+    rail.setAttribute('role', 'slider');
+    rail.setAttribute('tabindex', '0');
+    rail.setAttribute('aria-label', 'Summary detail');
+    rail.setAttribute('aria-valuemin', '0');
+    rail.setAttribute('aria-valuemax', String(lastIndex));
+
+    const fill = document.createElement('div');
+    fill.className = 'yt-detail-fill';
+    rail.appendChild(fill);
+
+    const dots = DETAIL_OPTIONS.map((opt, i) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'yt-detail-dot';
+        dot.style.left = posLeft(fracOf(i));
+        dot.setAttribute('aria-label', opt.label);
+        dot.addEventListener('click', () => select(i));
+        rail.appendChild(dot);
+        return dot;
+    });
+
+    const thumb = document.createElement('div');
+    thumb.className = 'yt-detail-thumb';
+    rail.appendChild(thumb);
+
+    row.appendChild(capLeft);
+    row.appendChild(rail);
+    row.appendChild(capRight);
+    control.appendChild(head);
+    control.appendChild(row);
+
+    function render() {
+        const frac = fracOf(index);
+        thumb.style.left = posLeft(frac);
+        // Fill runs from the first stop to the thumb centre.
+        fill.style.width = `calc((100% - ${THUMB_W}px) * ${frac})`;
+        value.textContent = DETAIL_OPTIONS[index].label;
+        rail.setAttribute('aria-valuenow', String(index));
+        rail.setAttribute('aria-valuetext', DETAIL_OPTIONS[index].label);
+        dots.forEach((d, i) => d.classList.toggle('active', i <= index));
+    }
+
+    function select(i, persist = true) {
+        const next = Math.min(lastIndex, Math.max(0, i));
+        index = next;
+        render();
+        if (persist) chrome.storage.local.set({ SUMMARY_LENGTH: DETAIL_OPTIONS[index].value });
+    }
+
+    rail.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); select(index - 1); }
+        else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); select(index + 1); }
+        else if (e.key === 'Home') { e.preventDefault(); select(0); }
+        else if (e.key === 'End') { e.preventDefault(); select(lastIndex); }
+    });
+
+    render();
+
+    // Sync to the persisted preference (no re-write) once storage resolves.
+    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
+        if (stored !== -1) select(stored, false);
+    });
+
+    return control;
+}
+
+// Gear (settings) icon markup, shared by the empty-state header.
+const GEAR_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
+// Build (or rebuild) the pre-generation empty state inside an existing container:
+// header (title + gear) and body (prompt + Detail slider + Generate button). Used
+// both for the first render and when the user hits Reset on a finished summary, so
+// picking a different Detail level and regenerating is always one path.
+function renderEmptyState(container) {
+    if (!container) return;
+
+    // Clear whatever was there (summary or prior empty state) and drop the DOM cache.
+    container.innerHTML = '';
+    _invalidateCache();
+    container.classList.remove('yt-has-summary');
 
     // Create panel element
     const panel = document.createElement('div');
@@ -193,65 +315,34 @@ function injectSidebar(secondary) {
     // Create panel header element
     const panelHeader = document.createElement('div');
     panelHeader.className = 'yt-timestamps-panel-header';
-    
-    // Create left group (title + model selector)
+
+    // Create left group (title)
     const headerLeft = document.createElement('div');
     headerLeft.className = 'yt-timestamps-header-left';
-    
+
     // Create header title element
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Timestamped Summary';
-    
-    // Create model selection dropdown
-    const headerModelSelect = document.createElement('select');
-    headerModelSelect.id = 'header-model-select';
-    headerModelSelect.className = 'yt-timestamps-model-select';
-    
-    const autoOption = document.createElement('option');
-    autoOption.value = 'auto';
-    autoOption.textContent = 'Auto';
-    
-    const geminiOption = document.createElement('option');
-    geminiOption.value = 'gemini';
-    geminiOption.textContent = 'Gemini';
-    
-    const mistralOption = document.createElement('option');
-    mistralOption.value = 'mistral';
-    mistralOption.textContent = 'Mistral';
-    
-    headerModelSelect.appendChild(autoOption);
-    headerModelSelect.appendChild(geminiOption);
-    headerModelSelect.appendChild(mistralOption);
-    
+
     // Create gear icon element
     const gearIcon = document.createElement('span');
     gearIcon.className = 'gear-icon';
-    gearIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 1 1 1.51 1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gearIcon.innerHTML = GEAR_SVG;
     gearIcon.onclick = () => {
         chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" });
     };
-    
+
     // Append elements
     headerLeft.appendChild(headerTitle);
-    headerLeft.appendChild(headerModelSelect);
     panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(gearIcon);
     panel.appendChild(panelHeader);
-    
-    // Add event listener to header model selection
-    headerModelSelect.addEventListener('change', (e) => {
-        const selectedModel = e.target.value;
-        chrome.storage.local.set({ SELECTED_MODEL: selectedModel });
-    });
-    
-    // Set default selection and disable unavailable models
-    updateModelDropdown(headerModelSelect);
-    
+
     // Create panel body (empty state before generation)
     const panelBody = document.createElement('div');
     panelBody.className = 'yt-timestamps-panel-body';
-    
+
     const emptyState = document.createElement('div');
     emptyState.className = 'yt-timestamps-empty-state';
     emptyState.innerHTML = `
@@ -264,12 +355,16 @@ function injectSidebar(secondary) {
         <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
     `;
     panelBody.appendChild(emptyState);
-    
+
+    // Per-video "Detail" control (density + depth). Lives in the empty state; the
+    // whole body is rebuilt on summary render, so it clears itself afterward.
+    panelBody.appendChild(buildDetailSlider());
+
     // Create action area element
     const actionArea = document.createElement('div');
     actionArea.id = 'action-area';
     actionArea.className = 'yt-timestamps-action-area';
-    
+
     // Create generate button element
     const genBtn = document.createElement('button');
     genBtn.textContent = 'Generate summary';
@@ -282,14 +377,12 @@ function injectSidebar(secondary) {
     actionArea.appendChild(genBtn);
     panelBody.appendChild(actionArea);
     panel.appendChild(panelBody);
-    
+
     // Append panel to container
     container.appendChild(panel);
-    
-    // Insert container into secondary
-    secondary.insertBefore(container, secondary.firstChild);
 
     // Apply initial height and observe player for resizes (must be after DOM insertion)
+    _lastAppliedHeight = 0;
     applyPlayerHeight();
     observePlayerResize();
     // Re-apply after a short delay to catch late layout shifts
@@ -301,7 +394,6 @@ function injectSidebar(secondary) {
         _themePref = res.THEME_PREF || 'system';
         applyPanelTheme(_themePref, container);
     });
-    ensureYtThemeObserver();
 
     // First-run onboarding: point new users to the settings gear icon
     chrome.storage.local.get(['SHOW_SETTINGS_HINT'], (res) => {
@@ -309,55 +401,28 @@ function injectSidebar(secondary) {
             showSettingsHint(panel, gearIcon);
         }
     });
+}
+
+// Function to inject sidebar into the DOM
+function injectSidebar(secondary) {
+    if (document.querySelector('.yt-timestamps-container')) return;
+
+    // Create container element
+    const container = document.createElement('div');
+    container.className = 'yt-timestamps-container';
+    // Apply the theme up-front (follows YouTube by default) to avoid a flash
+    applyPanelTheme('system', container);
+
+    // Insert container into secondary, then build the empty state inside it
+    secondary.insertBefore(container, secondary.firstChild);
+    renderEmptyState(container);
+    ensureYtThemeObserver();
 
     // Restore cached summary if available (e.g. after miniplayer toggle)
     const cachedSummary = getCachedSummary(getCurrentVideoId());
     if (cachedSummary) {
         renderTimestampsUI(cachedSummary);
     }
-}
-
-// Function to update model dropdown: disable options for missing/invalid keys, add tooltips
-function updateModelDropdown(selectEl) {
-    if (!selectEl) return;
-    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SELECTED_MODEL'], (result) => {
-        const geminiOption = selectEl.querySelector('option[value="gemini"]');
-        const mistralOption = selectEl.querySelector('option[value="mistral"]');
-        const autoOption = selectEl.querySelector('option[value="auto"]');
-
-        if (geminiOption) {
-            if (!result.GEMINI_API_KEY) {
-                geminiOption.disabled = true;
-                geminiOption.title = 'No Gemini API key set — add one in settings';
-            } else {
-                geminiOption.disabled = false;
-                geminiOption.title = '';
-            }
-        }
-
-        if (mistralOption) {
-            if (!result.MISTRAL_API_KEY) {
-                mistralOption.disabled = true;
-                mistralOption.title = 'No Mistral API key set — add one in settings';
-            } else {
-                mistralOption.disabled = false;
-                mistralOption.title = '';
-            }
-        }
-
-        if (autoOption) {
-            autoOption.disabled = false;
-            autoOption.title = '';
-        }
-
-        // Resolve selected model
-        let defaultModel = result.SELECTED_MODEL || 'auto';
-        const selectedOption = selectEl.querySelector(`option[value="${defaultModel}"]`);
-        if (selectedOption && selectedOption.disabled) {
-            defaultModel = 'auto';
-        }
-        selectEl.value = defaultModel;
-    });
 }
 
 // Function to show a first-run tooltip pointing at the settings gear icon
@@ -419,11 +484,9 @@ function showSettingsHint(panel, gearIcon) {
 function runAnalysis() {
     updateGenerateButton('extracting');
 
-    const headerModelSelect = document.getElementById('header-model-select');
-    const selectedModel = headerModelSelect ? headerModelSelect.value : 'auto';
-
-    // Send analysis request with timeout
-    const sendAnalysis = (model, timeout = 120000) => {
+    // Send analysis request with timeout. Model is a global preference (settings
+    // page); length is the per-video "Detail" preset chosen in the panel.
+    const sendAnalysis = (model, length, timeout = 120000) => {
         return new Promise((resolve) => {
             let resolved = false;
 
@@ -434,7 +497,7 @@ function runAnalysis() {
                 }
             }, timeout);
 
-            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model }, (res) => {
+            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model, length: length }, (res) => {
                 if (!resolved) {
                     resolved = true;
                     clearTimeout(timer);
@@ -453,7 +516,13 @@ function runAnalysis() {
     // Main execution
     (async () => {
         try {
-            const result = await sendAnalysis(selectedModel);
+            const prefs = await new Promise((resolve) =>
+                chrome.storage.local.get(['SELECTED_MODEL', 'SUMMARY_LENGTH'], resolve)
+            );
+            const model = prefs.SELECTED_MODEL || 'auto';
+            const length = prefs.SUMMARY_LENGTH || 'standard';
+
+            const result = await sendAnalysis(model, length);
 
             if (result && result.success) {
                 updateGenerateButton('done');
@@ -568,15 +637,38 @@ function renderTimestampsUI(summaryText) {
     panelHeader.className = 'yt-timestamps-panel-header';
     panelHeader.style.cursor = 'pointer';
     
+    // Left group: title + Reset. Reset returns to the empty state so the user can
+    // pick a different Detail level and regenerate.
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'yt-timestamps-header-left';
+
     const headerTitle = document.createElement('h3');
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Timestamped Summary';
-    
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'yt-reset-btn';
+    resetBtn.title = 'Start over';
+    resetBtn.setAttribute('aria-label', 'Start over');
+    resetBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    resetBtn.addEventListener('click', (e) => {
+        // Don't let the click bubble to the header (which toggles the accordion).
+        e.stopPropagation();
+        // Clear the cached summary so no re-inject restores it, then rebuild the
+        // empty state (the Detail slider re-syncs to the stored SUMMARY_LENGTH).
+        clearSummaryCache(getCurrentVideoId());
+        renderEmptyState(container);
+    });
+
+    headerLeft.appendChild(headerTitle);
+    headerLeft.appendChild(resetBtn);
+
     const toggleIcon = document.createElement('span');
     toggleIcon.className = 'yt-accordion-toggle-icon';
     toggleIcon.textContent = '›';
-    
-    panelHeader.appendChild(headerTitle);
+
+    panelHeader.appendChild(headerLeft);
     panelHeader.appendChild(toggleIcon);
     panel.appendChild(panelHeader);
     
@@ -589,9 +681,16 @@ function renderTimestampsUI(summaryText) {
     
     // Process summary text
     const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
-    
+    let itemCount = 0;
+
     lines.forEach(line => {
-        const cleanLine = line.replace(/```/g, '').trim();
+        // Normalize common LLM formatting drift so valid points aren't silently
+        // dropped: strip code fences/backticks, a leading list bullet, and
+        // markdown bold markers.
+        let cleanLine = line.replace(/`+/g, '').trim();
+        cleanLine = cleanLine.replace(/^[-*•]\s+/, '');
+        cleanLine = cleanLine.replace(/\*\*/g, '').trim();
+
         if (cleanLine.startsWith('#')) {
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'yt-section-header';
@@ -599,12 +698,17 @@ function renderTimestampsUI(summaryText) {
             timestampsList.appendChild(sectionHeader);
             return;
         }
-        
-        const timeMatch = cleanLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*-\s*(.+?):\s*(.+)$/);
+
+        // Match a timestamped point, tolerating format drift: optional brackets
+        // around the time, a hyphen / en-dash / em-dash (or nothing) before the
+        // title, and an optional ": description". This is what prevents the
+        // "sections but no items" render when the model swaps the plain hyphen.
+        const timeMatch = cleanLine.match(/^\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*[-–—]?\s*(.+?)(?::\s*(.+))?$/);
         if (timeMatch) {
             const time = timeMatch[1];
-            const title = timeMatch[2];
-            const description = timeMatch[3]; 
+            const title = timeMatch[2].trim();
+            const description = (timeMatch[3] || '').trim();
+            itemCount++;
             let sec = 0;
             const timeParts = time.split(':').map(Number);
             if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
@@ -689,7 +793,14 @@ function renderTimestampsUI(summaryText) {
             timestampsList.appendChild(accordionContent);
         }
     });
-    
+
+    // Safety net: if the model returned section headers but not a single
+    // parseable point, log the raw output so a recurrence can be diagnosed
+    // (rather than silently showing a header-only wall).
+    if (itemCount === 0) {
+        console.warn('[yt-timestamps] No timestamp items parsed from summary. Raw output:\n', summaryText);
+    }
+
     panelContent.appendChild(timestampsList);
     panel.appendChild(panelContent);
     container.appendChild(panel);

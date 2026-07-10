@@ -2,13 +2,13 @@
 
 import { LLMClient } from './llm-client.js';
 
-// Import constants for shared prompt
-import CONSTANTS from './constants.js';
+// Import constants + the prompt composer
+import CONSTANTS, { composeSummaryPrompt } from './constants.js';
 
 class GeminiClient extends LLMClient {
   // Function to call Gemini API
-  async callGeminiAPI(apiKey, transcript) {
-    const prompt = `${CONSTANTS.PROMPTS.SUMMARY_PROMPT}
+  async callGeminiAPI(apiKey, transcript, options = {}) {
+    const prompt = `${composeSummaryPrompt(options)}
 
 Here is the transcript: ${transcript}`;
 
@@ -16,7 +16,10 @@ Here is the transcript: ${transcript}`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        contents: [{ parts: [{ text: prompt }] }],
+        // A generous output budget so long In-depth summaries aren't truncated
+        // mid-list; low temperature steadies the point count run-to-run.
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.3 }
       })
     });
 
@@ -42,8 +45,8 @@ Here is the transcript: ${transcript}`;
   }
 
   // Implement LLMClient interface methods
-  async callAPI(apiKey, transcript) {
-    return this.callGeminiAPI(apiKey, transcript);
+  async callAPI(apiKey, transcript, options = {}) {
+    return this.callGeminiAPI(apiKey, transcript, options);
   }
 
   async validateKey(apiKey) {

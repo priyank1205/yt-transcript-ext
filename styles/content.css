@@ -135,6 +135,33 @@
   color: #ccc;
 }
 
+/* Reset ("start over") button — sits next to the title on the summary header.
+   Muted by default, red accent + spin on hover, matching the gear treatment. */
+.yt-timestamps-panel-header .yt-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #888;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.yt-timestamps-panel-header .yt-reset-btn svg {
+  display: block;
+}
+
+.yt-timestamps-panel-header .yt-reset-btn:hover {
+  opacity: 1;
+  color: #ff4d4d;
+  transform: rotate(-30deg);
+}
+
 /* Accordion Toggle Icon */
 .yt-accordion-toggle-icon {
   font-size: 22px;
@@ -198,44 +225,111 @@
   line-height: 1.4;
 }
 
-/* Model selection dropdown styles */
-.yt-timestamps-model-select {
-  background-color: #1a1a1a;
-  color: #ccc;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 4px 24px 4px 8px;
-  font-size: 11px;
+/* "Detail" slider (per-video density/depth) — Effort-style track */
+.yt-detail-control {
+  padding: 6px 16px 14px;
+  user-select: none;
+}
+
+.yt-detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.yt-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.yt-detail-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.yt-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-detail-cap {
+  font-size: 10px;
   font-weight: 500;
+  color: #777;
+  white-space: nowrap;
+}
+
+.yt-detail-rail {
+  position: relative;
+  flex: 1;
+  height: 16px;
   cursor: pointer;
   outline: none;
-  /* Drop the native OS arrow for a caret that matches the panel */
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.yt-timestamps-model-select:hover {
-  border-color: #666;
-  background-color: #222;
+/* Base track line, inset to the first/last stop centres */
+.yt-detail-rail::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  background: #333;
 }
 
-.yt-timestamps-model-select:focus {
-  border-color: #FF0000;
+.yt-detail-fill {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  background: #cc0000;
+  transition: width 0.18s ease;
 }
 
-/* Dropdown list items (Chrome only styles option bg/color) */
-.yt-timestamps-model-select option {
-  background: #1a1a1a;
-  color: #eaeaea;
+.yt-detail-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #555;
+  cursor: pointer;
+  z-index: 1;
+  transition: background 0.18s ease;
 }
 
-.yt-timestamps-model-select option:disabled {
-  color: #52525b;
-  background: #1a1a1a;
+.yt-detail-dot.active {
+  background: #ff4d4d;
+}
+
+.yt-detail-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 14px;
+  border-radius: 7px;
+  background: #ededed;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  pointer-events: none;
+  transition: left 0.18s ease;
+}
+
+.yt-detail-rail:focus-visible .yt-detail-thumb {
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* Action Area Styles */
@@ -536,6 +630,17 @@
   color: #fff;
 }
 
+/* Reset button sits on the red light-theme header bar — keep it white. */
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn {
+  color: #fff;
+  opacity: 0.85;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn:hover {
+  color: #fff;
+  opacity: 1;
+}
+
 .yt-timestamps-container.yt-theme-light .yt-accordion-toggle-icon {
   color: #fcfcfc;
 }
@@ -560,32 +665,43 @@
   border-color: #e2cece !important;
 }
 
-/* Model select — soft pink control that reads against the red header,
-   with a red caret and a clean white dropdown list */
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select {
-  background-color: #ffdbdb;
-  color: #8a0000;
-  border-color: rgba(204, 0, 0, 0.25);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23cc0000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+/* "Detail" slider — light track with the brand-red fill/thumb accents */
+.yt-timestamps-container.yt-theme-light .yt-detail-label {
+  color: #606060;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:hover {
-  background-color: #ffcccc;
-  border-color: rgba(204, 0, 0, 0.45);
-}
-
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select:focus {
-  border-color: #cc0000;
-}
-
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option {
-  background: #fff;
+.yt-timestamps-container.yt-theme-light .yt-detail-value {
   color: #0f0f0f;
 }
 
-.yt-timestamps-container.yt-theme-light .yt-timestamps-model-select option:disabled {
+.yt-timestamps-container.yt-theme-light .yt-detail-cap {
   color: #909090;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-rail::before {
+  background: #d8d8d8;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-fill {
+  background: #cc0000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-dot {
+  background: #c4c4c4;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-dot.active {
+  background: #d63b3b;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-thumb {
   background: #fff;
+  border: 1px solid #e2cece;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-detail-rail:focus-visible .yt-detail-thumb {
+  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 /* Empty state */

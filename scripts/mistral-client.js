@@ -2,13 +2,13 @@
 
 import { LLMClient } from './llm-client.js';
 
-// Import constants for shared prompt
-import CONSTANTS from './constants.js';
+// Import constants + the prompt composer
+import CONSTANTS, { composeSummaryPrompt } from './constants.js';
 
 class MistralClient extends LLMClient {
   // Function to call Mistral API
-  async callMistralAPI(apiKey, transcript) {
-    const prompt = `${CONSTANTS.PROMPTS.SUMMARY_PROMPT}
+  async callMistralAPI(apiKey, transcript, options = {}) {
+    const prompt = `${composeSummaryPrompt(options)}
 
 Here is the transcript: ${transcript}`;
 
@@ -20,6 +20,10 @@ Here is the transcript: ${transcript}`;
       },
       body: JSON.stringify({
         model: "mistral-large-latest",
+        // A generous output budget so long In-depth summaries aren't truncated
+        // mid-list; low temperature steadies the point count run-to-run.
+        max_tokens: 8000,
+        temperature: 0.3,
         messages: [
           {
             role: "user",
@@ -51,8 +55,8 @@ Here is the transcript: ${transcript}`;
   }
 
   // Implement LLMClient interface methods
-  async callAPI(apiKey, transcript) {
-    return this.callMistralAPI(apiKey, transcript);
+  async callAPI(apiKey, transcript, options = {}) {
+    return this.callMistralAPI(apiKey, transcript, options);
   }
 
   async validateKey(apiKey) {

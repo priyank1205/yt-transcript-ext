@@ -27,6 +27,23 @@ function getOtherModel(model) {
   return model === 'gemini' ? 'mistral' : 'gemini';
 }
 
+// Helper: derive the video's duration (in minutes) from the transcript's last
+// timestamp. The transcript is `[h:mm:ss]`/`[mm:ss]` lines; the final one is
+// T_end. Used to compute a concrete per-Detail point count. Returns null if no
+// timestamp can be parsed (the prompt then falls back to static directives).
+function parseDurationMinutes(transcript) {
+  if (!transcript || typeof transcript !== 'string') return null;
+  const matches = transcript.match(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g);
+  if (!matches || matches.length === 0) return null;
+  const last = matches[matches.length - 1].replace(/[[\]]/g, '');
+  const parts = last.split(':').map(Number);
+  let seconds = 0;
+  if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
+  else return null;
+  return seconds > 0 ? seconds / 60 : null;
+}
+
 // Helper: create LLM client by model name
 function getClient(modelName) {
   switch (modelName.toLowerCase()) {
@@ -52,15 +69,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
   if (request.action === "START_GEMINI_ANALYSIS") {
-    handleGeminiAnalysis(sendResponse, request.model).catch(err => {
+    handleGeminiAnalysis(sendResponse, request.model, request.length).catch(err => {
       console.warn('Unhandled error in handleGeminiAnalysis:', err);
       sendResponse({ success: false, error: err.message || 'Unknown error occurred' });
     });
-    return true; 
+    return true;
   }
 });
 
-async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
+async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) {
   const originalModel = modelName;
   console.log(`handleGeminiAnalysis called with model: ${originalModel}`);
   
@@ -76,7 +93,11 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     }
     
     // Fetch all storage keys once upfront
-    const storage = await chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY']);
+    const storage = await chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY', 'SUMMARY_LENGTH']);
+
+    // Resolve the summary "Detail" preset: explicit request wins, then the
+    // persisted preference, then the standard default. Passed to every callAPI.
+    const summaryOptions = { length: length || storage.SUMMARY_LENGTH || 'standard' };
     
     // 2. Resolve 'auto' to actual model
     let resolvedModel = modelName;
@@ -114,6 +135,11 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
       sendResponse({ success: false, error: errorMsg, keepOpen });
       return;
     }
+
+    // Derive the real duration so the prompt can inject concrete point/section
+    // counts (falls back to static directives if it can't be parsed).
+    summaryOptions.durationMinutes = parseDurationMinutes(transcriptResponse.data);
+    console.log(`Transcript duration (min): ${summaryOptions.durationMinutes}`);
     
     // 5. Get API key for resolved model
     const apiKey = storage[`${resolvedModel.toUpperCase()}_API_KEY`];
@@ -153,7 +179,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
     
     let summary;
     try {
-      summary = await llmClient.callAPI(finalApiKey, transcriptResponse.data);
+      summary = await llmClient.callAPI(finalApiKey, transcriptResponse.data, summaryOptions);
     } catch (apiErr) {
       console.warn(`API call failed for ${resolvedModel}:`, apiErr.message);
       
@@ -172,7 +198,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini') {
         }
         
         const fallbackClient = getClient(fallbackModel);
-        summary = await fallbackClient.callAPI(fallbackKey, transcriptResponse.data);
+        summary = await fallbackClient.callAPI(fallbackKey, transcriptResponse.data, summaryOptions);
         console.log(`Fallback to ${fallbackModel} succeeded`);
       } else {
         throw apiErr;
