@@ -890,7 +890,7 @@ function renderTimestampsUI(summaryText) {
             
             const timeLabel = document.createElement('span');
             timeLabel.className = 'yt-time-label';
-            timeLabel.innerHTML = `<span class="yt-time">[${time}]</span> <span class="yt-title">${title}</span>`;
+            timeLabel.innerHTML = `<span class="yt-time">${time}</span> <span class="yt-title">${title}</span>`;
             
             const expandBtn = document.createElement('span');
             expandBtn.textContent = '+';

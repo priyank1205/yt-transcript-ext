@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "theme-harness",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8848",
+        "--directory",
+        "/private/tmp/claude-501/-Users-priyank-Library-Mobile-Documents-com-apple-CloudDocs-Documents-Coding-vibecoded-yt-transcript-ext/e523866f-f943-485f-a33f-7bbc610aa128/scratchpad/theme-harness"
+      ],
+      "port": 8848
+    },
+    {
+      "name": "options-page",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8849",
+        "--directory",
+        "/Users/priyank/Library/Mobile Documents/com~apple~CloudDocs/Documents/Coding/vibecoded/yt-transcript-ext"
+      ],
+      "port": 8849
+    }
+  ]
+}
