@@ -513,9 +513,14 @@
 
 .yt-time {
   font-size: 12px !important;
-  font-weight: 600 !important;
-  color: #FF0000 !important;
+  font-weight: 700 !important;
+  color: #FF0033 !important;
+  background: rgba(255, 0, 51, 0.2);
+  padding: 4px 8px;
+  border-radius: 16px;
   margin-right: 8px;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
 }
 
 .yt-title {
@@ -907,7 +912,8 @@
 }
 
 .yt-timestamps-container.yt-theme-light .yt-time {
-  color: #cc0000 !important;
+  color: #FF0033 !important;
+  background: rgba(255, 0, 51, 0.08);
 }
 
 .yt-timestamps-container.yt-theme-light .yt-title {
