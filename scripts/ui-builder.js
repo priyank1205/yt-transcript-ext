@@ -777,6 +777,50 @@ function updateGenerateButton(phase, message, keepOpen) {
     }
 }
 
+// Reveal a timestamp title that's too long to fit on one line. On hover — but
+// only when the text is actually truncated — a tooltip with the full title is
+// shown. It's mounted on the container (position:relative) rather than the row,
+// because the row's overflow:hidden would otherwise clip it. One tooltip element
+// is shared across all rows in a panel.
+function attachTitleTooltip(titleEl) {
+    const show = () => {
+        // Nothing to reveal if the title fits without ellipsis.
+        if (titleEl.scrollWidth <= titleEl.clientWidth) return;
+        const container = titleEl.closest('.yt-timestamps-container');
+        if (!container) return;
+
+        let tip = container.querySelector('.yt-title-tooltip');
+        if (!tip) {
+            tip = document.createElement('div');
+            tip.className = 'yt-title-tooltip';
+            container.appendChild(tip);
+        }
+        tip.textContent = titleEl.textContent;
+        tip.hidden = false;
+
+        // Position relative to the container, clamped inside its edges. Prefer
+        // sitting above the row; drop below if there's no room up top.
+        const tRect = titleEl.getBoundingClientRect();
+        const cRect = container.getBoundingClientRect();
+        const gap = 8;
+        let left = tRect.left - cRect.left;
+        const maxLeft = cRect.width - tip.offsetWidth - 8;
+        if (left > maxLeft) left = maxLeft;
+        if (left < 8) left = 8;
+        tip.style.left = `${left}px`;
+
+        let top = tRect.top - cRect.top - tip.offsetHeight - gap;
+        if (top < 4) top = tRect.bottom - cRect.top + gap;
+        tip.style.top = `${top}px`;
+    };
+    const hide = () => {
+        const tip = titleEl.closest('.yt-timestamps-container')?.querySelector('.yt-title-tooltip');
+        if (tip) tip.hidden = true;
+    };
+    titleEl.addEventListener('mouseenter', show);
+    titleEl.addEventListener('mouseleave', hide);
+}
+
 // Function to render timestamps UI from processed data
 function renderTimestampsUI(summaryText) {
     // Cache the summary for restoration across DOM rebuilds (e.g. miniplayer toggle)
@@ -891,6 +935,7 @@ function renderTimestampsUI(summaryText) {
             const timeLabel = document.createElement('span');
             timeLabel.className = 'yt-time-label';
             timeLabel.innerHTML = `<span class="yt-time">${time}</span> <span class="yt-title">${title}</span>`;
+            attachTitleTooltip(timeLabel.querySelector('.yt-title'));
             
             const expandBtn = document.createElement('span');
             expandBtn.textContent = '+';
