@@ -301,6 +301,26 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Hover tooltip that reveals a timestamp title too long to fit on its row.
+   Mounted on the container so the row's overflow:hidden can't clip it. */
+.yt-title-tooltip {
+  position: absolute;
+  z-index: 60;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: #1c1c1c;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  pointer-events: none;
+  animation: ytDetailPopIn 0.14s ease;
+}
+
 /* Title row: "Detail <value>" on the left, "?" help toggle on the right */
 .yt-detail-top {
   display: flex;
@@ -790,6 +810,13 @@
   background: #fff;
   border-color: #e2d3d3;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-title-tooltip {
+  background: #fff;
+  border-color: #e2d3d3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  color: #333;
 }
 
 /* "Detail" slider — light track with a grey lozenge thumb */
