@@ -12,7 +12,8 @@ class GeminiClient extends LLMClient {
 
 Here is the transcript: ${transcript}`;
 
-    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
+    const modelId = options.modelId || 'gemini-3.1-flash-lite-preview';
+    const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
     const response = await fetch(`${API_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,6 +62,22 @@ Here is the transcript: ${transcript}`;
       return res.ok;
     } catch {
       return false;
+    }
+  }
+
+  async fetchModels(apiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.models
+        .filter(m => m.supportedGenerationMethods.includes('generateContent'))
+        .map(m => ({
+          id: m.name.replace('models/', ''),
+          name: m.displayName || m.name.replace('models/', '')
+        }));
+    } catch {
+      return [];
     }
   }
 

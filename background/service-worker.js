@@ -59,11 +59,10 @@ function recordSummaryStat(summary, durationMinutes) {
   });
 }
 
-// Helper: create LLM client by model name
 function getClient(modelName) {
   const provider = PROVIDERS[modelName.toLowerCase()];
   if (!provider) throw new Error(`Unsupported model: ${modelName}`);
-  return new provider.clientClass();
+  return new provider.clientClass(provider);
 }
 
 // Handle messages from content script
@@ -81,18 +80,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return;
   }
-  if (request.action === "START_GEMINI_ANALYSIS") {
-    handleGeminiAnalysis(sendResponse, request.model, request.length).catch(err => {
-      console.warn('Unhandled error in handleGeminiAnalysis:', err);
+  if (request.action === "START_ANALYSIS") {
+    handleAnalysis(sendResponse, request.model, request.length).catch(err => {
+      console.warn('Unhandled error in handleAnalysis:', err);
       sendResponse({ success: false, error: err.message || 'Unknown error occurred' });
     });
     return true;
   }
 });
 
-async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) {
+async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
   const originalModel = modelName;
-  console.log(`handleGeminiAnalysis called with model: ${originalModel}`);
+  console.log(`handleAnalysis called with model: ${originalModel}`);
   
   try {
     // 1. Get the active tab
@@ -107,7 +106,9 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) 
     
     // Fetch all storage keys dynamically based on registry
     const storageKeys = Object.values(PROVIDERS).map(p => p.storageKey);
+    const modelKeys = Object.values(PROVIDERS).map(p => `${p.id}_MODEL`);
     storageKeys.push('SUMMARY_LENGTH');
+    storageKeys.push(...modelKeys);
     const storage = await chrome.storage.local.get(storageKeys);
 
     // Resolve the summary "Detail" preset: explicit request wins, then the
@@ -192,6 +193,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) 
     
     let summary;
     try {
+      summaryOptions.modelId = storage[`${resolvedModel}_MODEL`] || PROVIDERS[resolvedModel].defaultModel;
       summary = await llmClient.callAPI(finalApiKey, transcriptResponse.data, summaryOptions);
     } catch (apiErr) {
       console.warn(`API call failed for ${resolvedModel}:`, apiErr.message);
@@ -211,6 +213,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) 
         
         const fallbackKey = storage[PROVIDERS[fallbackModel].storageKey];
         const fallbackClient = getClient(fallbackModel);
+        summaryOptions.modelId = storage[`${fallbackModel}_MODEL`] || PROVIDERS[fallbackModel].defaultModel;
         summary = await fallbackClient.callAPI(fallbackKey, transcriptResponse.data, summaryOptions);
         console.log(`Fallback to ${fallbackModel} succeeded`);
         resolvedModel = fallbackModel;
@@ -232,7 +235,7 @@ async function handleGeminiAnalysis(sendResponse, modelName = 'gemini', length) 
     console.log('Sending success response');
     sendResponse({ success: true, data: summary, model: resolvedModel });
   } catch (err) {
-    console.warn('Error in handleGeminiAnalysis:', err.message, err.stack);
+    console.warn('Error in handleAnalysis:', err.message, err.stack);
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [null]);
     if (tab) {
       await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message });

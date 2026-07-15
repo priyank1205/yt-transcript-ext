@@ -659,7 +659,7 @@ function runAnalysis() {
                 }
             }, timeout);
 
-            chrome.runtime.sendMessage({ action: "START_GEMINI_ANALYSIS", model: model, length: length }, (res) => {
+            chrome.runtime.sendMessage({ action: "START_ANALYSIS", model: model, length: length }, (res) => {
                 if (!resolved) {
                     resolved = true;
                     clearTimeout(timer);
