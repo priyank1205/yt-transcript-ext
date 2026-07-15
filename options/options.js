@@ -253,6 +253,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   
+  
+  const modalObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'hidden') {
+        const isHidden = mutation.target.hidden;
+        if (!isHidden) {
+          document.body.style.overflow = 'hidden';
+        } else {
+          // Check if ANY modal is open before unlocking
+          if (providerSetupModal.hidden && selectorModal.hidden) {
+            document.body.style.overflow = '';
+          }
+        }
+      }
+    });
+  });
+  
+  modalObserver.observe(providerSetupModal, { attributes: true });
+  modalObserver.observe(selectorModal, { attributes: true });
+
   let customProvidersList = [];
 
   // Initial load
