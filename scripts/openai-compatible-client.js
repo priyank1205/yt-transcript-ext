@@ -51,7 +51,14 @@ Here is the transcript: ${transcript}`;
       })
     });
 
-    const result = await response.json();
+    const text = await response.text();
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      // If it's not JSON, it's likely an HTML error page or plain text error like "404 Not Found"
+      throw new Error(`API returned invalid JSON (Status ${response.status}): ${text.substring(0, 60)}`);
+    }
     
     // Check for API errors first
     if (!response.ok || result.error) {
@@ -59,6 +66,7 @@ Here is the transcript: ${transcript}`;
       let errorMsg;
       if (status === 401) errorMsg = 'Invalid API key. Please check your settings.';
       else if (status === 403) errorMsg = 'API key expired or unauthorized. Please check your settings.';
+      else if (status === 404) errorMsg = `Endpoint not found (404). Did you forget to add /v1/chat/completions to your Base URL?`;
       else if (status === 429) errorMsg = 'Rate limit exceeded. Please try again later.';
       else if (status >= 500) errorMsg = `${this.getModelName()} service unavailable. Please try again later.`;
       else errorMsg = result.error?.message || `${this.getModelName()} API error: ${status}`;

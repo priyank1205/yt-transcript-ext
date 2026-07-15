@@ -1,7 +1,7 @@
 // background/service-worker.js
 
-// Import the providers registry
 import { PROVIDERS } from '../scripts/providers.js';
+import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 
 // First-run onboarding: on fresh install, open the settings page and flag the
 // in-page tooltip that points new users to the settings gear icon.
@@ -59,8 +59,8 @@ function recordSummaryStat(summary, durationMinutes) {
   });
 }
 
-function getClient(modelName) {
-  const provider = PROVIDERS[modelName.toLowerCase()];
+function getClient(modelName, allProviders) {
+  const provider = allProviders[modelName.toLowerCase()];
   if (!provider) throw new Error(`Unsupported model: ${modelName}`);
   return new provider.clientClass(provider);
 }
@@ -104,9 +104,20 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
       return;
     }
     
+    const initialStorage = await chrome.storage.local.get(['CUSTOM_PROVIDERS']);
+    const customProviders = initialStorage.CUSTOM_PROVIDERS || [];
+    
+    const allProviders = { ...PROVIDERS };
+    customProviders.forEach(cp => {
+      allProviders[cp.id] = {
+        ...cp,
+        clientClass: OpenAICompatibleClient
+      };
+    });
+
     // Fetch all storage keys dynamically based on registry
-    const storageKeys = Object.values(PROVIDERS).map(p => p.storageKey);
-    const modelKeys = Object.values(PROVIDERS).map(p => `${p.id}_MODEL`);
+    const storageKeys = Object.values(allProviders).map(p => p.storageKey);
+    const modelKeys = Object.values(allProviders).map(p => `${p.id}_MODEL`);
     storageKeys.push('SUMMARY_LENGTH');
     storageKeys.push(...modelKeys);
     const storage = await chrome.storage.local.get(storageKeys);
@@ -118,17 +129,17 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
     // 2. Resolve 'auto' to actual model
     let resolvedModel = modelName;
     if (modelName === 'auto') {
-      const availableProviders = Object.keys(PROVIDERS).filter(id => storage[PROVIDERS[id].storageKey]);
+      const availableProviders = Object.keys(allProviders).filter(id => storage[allProviders[id].storageKey] || (allProviders[id].isCustom && storage[allProviders[id].storageKey] === ''));
       if (availableProviders.length > 0) {
         resolvedModel = availableProviders[0];
       } else {
-        resolvedModel = Object.keys(PROVIDERS)[0]; // fallback to first provider so it can trigger 'no key' error
+        resolvedModel = Object.keys(allProviders)[0]; // fallback to first provider so it can trigger 'no key' error
       }
       console.log(`Auto-resolved to: ${resolvedModel}`);
     }
     
     // 3. Create LLM client
-    let llmClient = getClient(resolvedModel);
+    let llmClient = getClient(resolvedModel, allProviders);
     console.log(`Created LLM client for model: ${resolvedModel}`);
     
     // 4. Fetch transcript (once, reused for fallback)
@@ -157,17 +168,18 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
     console.log(`Transcript duration (min): ${summaryOptions.durationMinutes}`);
     
     // 5. Get API key for resolved model
-    const apiKey = storage[PROVIDERS[resolvedModel].storageKey];
+    const apiKey = storage[allProviders[resolvedModel].storageKey];
+    const isCustomEmptyKey = allProviders[resolvedModel].isCustom && apiKey === '';
     console.log(`Getting API key for model: ${resolvedModel}`);
     
-    if (!apiKey) {
+    if (!apiKey && !isCustomEmptyKey) {
       // If auto mode, try another model's key
       if (originalModel === 'auto') {
-        const fallbackModel = Object.keys(PROVIDERS).find(id => id !== resolvedModel && storage[PROVIDERS[id].storageKey]);
+        const fallbackModel = Object.keys(allProviders).find(id => id !== resolvedModel && (storage[allProviders[id].storageKey] || (allProviders[id].isCustom && storage[allProviders[id].storageKey] === '')));
         if (fallbackModel) {
           console.log(`No key for ${resolvedModel}, but ${fallbackModel} has a key. Switching.`);
           resolvedModel = fallbackModel;
-          llmClient = getClient(resolvedModel);
+          llmClient = getClient(resolvedModel, allProviders);
         } else {
           const errorMsg = `No API key found. Please set one in settings.`;
           await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
@@ -175,7 +187,7 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
           return;
         }
       } else {
-        const errorMsg = `API Key not found for ${PROVIDERS[resolvedModel].name}. Please set it in settings.`;
+        const errorMsg = `API Key not found for ${allProviders[resolvedModel].name}. Please set it in settings.`;
         console.warn(errorMsg);
         await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
         sendResponse({ success: false, error: errorMsg });
@@ -183,7 +195,7 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
       }
     }
     
-    const finalApiKey = storage[PROVIDERS[resolvedModel].storageKey];
+    const finalApiKey = apiKey;
     console.log(`API Key found for ${resolvedModel}, length: ${finalApiKey?.length}`);
     
     // 6. Call the LLM API
@@ -193,14 +205,14 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
     
     let summary;
     try {
-      summaryOptions.modelId = storage[`${resolvedModel}_MODEL`] || PROVIDERS[resolvedModel].defaultModel;
+      summaryOptions.modelId = storage[`${resolvedModel}_MODEL`] || allProviders[resolvedModel].defaultModel;
       summary = await llmClient.callAPI(finalApiKey, transcriptResponse.data, summaryOptions);
     } catch (apiErr) {
       console.warn(`API call failed for ${resolvedModel}:`, apiErr.message);
       
       // Auto fallback: try another model with the same transcript
       if (originalModel === 'auto') {
-        const fallbackModel = Object.keys(PROVIDERS).find(id => id !== resolvedModel && storage[PROVIDERS[id].storageKey]);
+        const fallbackModel = Object.keys(allProviders).find(id => id !== resolvedModel && (storage[allProviders[id].storageKey] || (allProviders[id].isCustom && storage[allProviders[id].storageKey] === '')));
         console.log(`${resolvedModel} failed, trying ${fallbackModel || 'none'}...`);
         
         if (!fallbackModel) {
@@ -209,11 +221,11 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
           return;
         }
 
-        await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api", message: `Trying ${PROVIDERS[fallbackModel].name}...` });
+        await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "calling_api", message: `Trying ${allProviders[fallbackModel].name}...` });
         
-        const fallbackKey = storage[PROVIDERS[fallbackModel].storageKey];
-        const fallbackClient = getClient(fallbackModel);
-        summaryOptions.modelId = storage[`${fallbackModel}_MODEL`] || PROVIDERS[fallbackModel].defaultModel;
+        const fallbackKey = storage[allProviders[fallbackModel].storageKey];
+        const fallbackClient = getClient(fallbackModel, allProviders);
+        summaryOptions.modelId = storage[`${fallbackModel}_MODEL`] || allProviders[fallbackModel].defaultModel;
         summary = await fallbackClient.callAPI(fallbackKey, transcriptResponse.data, summaryOptions);
         console.log(`Fallback to ${fallbackModel} succeeded`);
         resolvedModel = fallbackModel;
