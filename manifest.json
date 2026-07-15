@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Transcript Extractor",
   "version": "1.2",
-  "description": "Extracts and summarizes transcripts from YouTube videos using Gemini.",
+  "description": "Extracts and summarizes transcripts from YouTube videos using AI.",
   "permissions": [
     "activeTab",
     "scripting",

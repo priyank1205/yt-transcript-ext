@@ -8,11 +8,11 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 **Features:**
 
 - Extracts the full timestamped transcript from any YouTube video
-- Generates a structured, sectioned summary using an LLM (Gemini or Mistral)
+- Generates a structured, sectioned summary using an LLM (supports multiple providers like Gemini, Mistral, etc.)
 - Every summary point is linked to its exact video timestamp — click to seek
 - Expand a summary point to see in detail
 - Collapse/expand the complete panel
-- Model selector with Auto mode (falls back between Gemini and Mistral)
+- Model selector with Auto mode (falls back across available configured providers)
 - Works on any YouTube video with captions enabled
 
 **How it works:**
@@ -27,7 +27,7 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 
 1. Install the extension in Chrome
 2. Open the extension's settings (gear icon in the panel, or right-click the extension icon)
-3. Paste your API key for Gemini and/or Mistral
+3. Paste your API key for any of the supported providers (e.g. Gemini, Mistral)
 4. [Optional] Choose a model in the panel dropdown
 
 Get a Gemini API key: https://aistudio.google.com/apikey

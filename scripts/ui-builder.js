@@ -609,7 +609,7 @@ function showSettingsHint(panel, gearIcon) {
 
     const text = document.createElement('div');
     text.className = 'yt-settings-hint-text';
-    text.textContent = 'Open Settings from this icon anytime to add or update your Gemini and Mistral API keys.';
+    text.textContent = 'Open Settings from this icon anytime to add or update your LLM API keys.';
 
     const dismiss = document.createElement('button');
     dismiss.className = 'yt-settings-hint-dismiss';
@@ -705,8 +705,8 @@ function runAnalysis() {
 // With no key set, the button opens the settings page instead of running analysis.
 function setGenerateButtonMode(genBtn) {
     if (!genBtn) return;
-    chrome.storage.local.get(['GEMINI_API_KEY', 'MISTRAL_API_KEY'], (res) => {
-        const hasKey = !!(res.GEMINI_API_KEY || res.MISTRAL_API_KEY);
+    chrome.storage.local.get(null, (res) => {
+        const hasKey = Object.keys(res).some(key => key.endsWith('_API_KEY') && !!res[key]);
         const emptyText = document.querySelector('.yt-empty-text');
         if (hasKey) {
             genBtn.textContent = 'Generate summary';
@@ -717,7 +717,7 @@ function setGenerateButtonMode(genBtn) {
             genBtn.textContent = 'Set API keys';
             genBtn.classList.add('yt-needs-keys');
             genBtn.onclick = () => { chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" }); };
-            if (emptyText) emptyText.textContent = 'Add a Gemini or Mistral API key to start generating summaries';
+            if (emptyText) emptyText.textContent = 'Add an LLM API key to start generating summaries';
         }
     });
 }
