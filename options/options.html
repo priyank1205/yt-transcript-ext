@@ -239,7 +239,6 @@
     .model-icon {
       width: 36px;
       height: 36px;
-      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -247,28 +246,18 @@
       position: relative;
     }
 
-    .model-icon.gemini {
-      background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
-      box-shadow: 0 2px 12px rgba(66, 133, 244, 0.2);
-    }
-
-    .model-icon.mistral {
-      background: #fff;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    }
-
     .model-icon svg {
-      width: 18px;
-      height: 18px;
-      fill: #fff;
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
     }
 
     .model-icon.mistral svg {
-      width: 20px;
-      height: 18px;
+      width: 22px;
+      height: 22px;
     }
 
-    .model-icon.openai { color: #10a37f; }
+    .model-icon.openai { color: #fafafa; }
     
     .delete-custom-btn {
       background: none;
@@ -1357,54 +1346,6 @@
           Add Provider
         </button>
       
-      <!-- Provider Setup Modal -->
-      <div id="provider-setup-modal" class="modal-overlay" hidden>
-        <!-- List View -->
-        <div class="modal command-palette" id="provider-list-view">
-          <div class="modal-header">
-            <div>
-              <h3 style="font-size: 15px; font-weight: 600;">Add Provider</h3>
-            </div>
-            <button class="close-modal" id="close-provider-setup-btn">
-              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            </button>
-          </div>
-          <div class="command-list" id="unconfigured-providers-list">
-            <!-- Populated dynamically via JS with unconfigured providers -->
-          </div>
-          <div class="command-list" style="border-top: 1px solid rgba(255,255,255,0.06);">
-            <div class="command-item" id="add-custom-provider-item">
-              <div class="command-item-icon" style="color: #a1a1aa;">
-                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              </div>
-              <div class="command-item-name">Add Custom Provider</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Config View -->
-        <div class="modal-content" id="provider-config-view" hidden>
-          <div class="modal-header">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <button class="icon-btn" id="provider-config-back-btn" style="margin-left: -8px;">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-              </button>
-              <div>
-                <h3 id="provider-config-title">Configure Provider</h3>
-                <div style="font-size: 12px; color: #71717a; margin-top: 4px;" id="provider-config-subtitle">Enter API details below</div>
-              </div>
-            </div>
-            <button class="close-modal" id="close-provider-config-btn">
-              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            </button>
-          </div>
-          
-          <div class="modal-body" id="provider-config-body">
-            <!-- Injected standard model card OR Custom provider form -->
-          </div>
-        </div>
-      </div>
-
       <!-- Hidden template for custom provider form -->
       <template id="custom-provider-form-template">
         <div class="input-group">
@@ -1532,6 +1473,57 @@
         </div>
       </section>
 
+    </main>
+  </div>
+
+      <!-- Provider Setup Modal -->
+      <div id="provider-setup-modal" class="modal-overlay" hidden>
+        <!-- List View -->
+        <div class="modal command-palette" id="provider-list-view">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size: 15px; font-weight: 600;">Add Provider</h3>
+            </div>
+            <button class="close-modal" id="close-provider-setup-btn">
+              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
+          <div class="command-list" id="unconfigured-providers-list">
+            <!-- Populated dynamically via JS with unconfigured providers -->
+          </div>
+          <div class="command-list" style="border-top: 1px solid rgba(255,255,255,0.06);">
+            <div class="command-item" id="add-custom-provider-item">
+              <div class="command-item-icon" style="color: #a1a1aa;">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </div>
+              <div class="command-item-name">Add Custom Provider</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Config View -->
+        <div class="modal-content" id="provider-config-view" hidden>
+          <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button class="close-modal" id="provider-config-back-btn" style="margin-left: -8px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+              </button>
+              <div>
+                <h3 id="provider-config-title">Configure Provider</h3>
+                <div style="font-size: 12px; color: #71717a; margin-top: 4px;" id="provider-config-subtitle">Enter API details below</div>
+              </div>
+            </div>
+            <button class="close-modal" id="close-provider-config-btn">
+              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
+          
+          <div class="modal-body" id="provider-config-body">
+            <!-- Injected standard model card OR Custom provider form -->
+          </div>
+        </div>
+      </div>
+
       <!-- Command Palette Modal for Model Selection -->
       <div id="selector-modal" class="modal-overlay" hidden>
         <div class="modal command-palette">
@@ -1550,10 +1542,7 @@
         </div>
       </div>
 
-    </main>
-  </div>
-
-  <div class="toast" id="toast">
+    <div class="toast" id="toast">
     <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
     <span id="toast-message">Saved successfully</span>
   </div>
