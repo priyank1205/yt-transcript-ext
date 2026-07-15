@@ -37,149 +37,228 @@ document.addEventListener('DOMContentLoaded', async () => {
   let providerElements = {};
   let ALL_PROVIDERS = {};
 
-  const modelSegmented = document.getElementById('model-segmented');
+
   const providersList = document.getElementById('providers-list');
+  const addProviderBtn = document.getElementById('add-provider-btn');
+  
+  const providerSetupModal = document.getElementById('provider-setup-modal');
+  const providerListView = document.getElementById('provider-list-view');
+  const unconfiguredProvidersList = document.getElementById('unconfigured-providers-list');
+  const addCustomProviderItem = document.getElementById('add-custom-provider-item');
+  
+  const providerConfigView = document.getElementById('provider-config-view');
+  const providerConfigBody = document.getElementById('provider-config-body');
+  const providerConfigTitle = document.getElementById('provider-config-title');
+  const providerConfigBackBtn = document.getElementById('provider-config-back-btn');
+  const closeProviderSetupBtn = document.getElementById('close-provider-setup-btn');
+  const closeProviderConfigBtn = document.getElementById('close-provider-config-btn');
+  
+  const customProviderTemplate = document.getElementById('custom-provider-form-template');
 
-  function renderProvidersList(customProviders = []) {
-    configured = {};
-    providerElements = {};
+  
+  // Model selector elements
+  const modelSelectorContainer = document.getElementById('model-selector-container');
+  const modelSelectorBtn = document.getElementById('model-selector-btn');
+  const activeModelText = document.getElementById('active-model-text');
+  const activeModelIcon = document.getElementById('active-model-icon');
+  
+  const selectorModal = document.getElementById('selector-modal');
+  const closeSelectorBtn = document.getElementById('close-selector-btn');
+  const selectorSearch = document.getElementById('selector-search');
+  const selectorList = document.getElementById('selector-list');
+
+  async function loadAndRenderProviders() {
+    const res = await new Promise(resolve => chrome.storage.local.get(null, resolve));
+    
+    customProvidersList = res.CUSTOM_PROVIDERS || [];
     ALL_PROVIDERS = { ...PROVIDERS };
-
-    customProviders.forEach(cp => {
+    
+    customProvidersList.forEach(cp => {
       ALL_PROVIDERS[cp.id] = {
         ...cp,
         clientClass: OpenAICompatibleClient
       };
     });
 
-    modelSegmented.innerHTML = '<button class="segmented-option" data-model="auto" role="radio" aria-checked="true">Auto</button>';
     providersList.innerHTML = '';
+    unconfiguredProvidersList.innerHTML = '';
+    providerElements = {};
+    configured = {};
 
     Object.values(ALL_PROVIDERS).forEach(p => {
-      // Segmented Button
-      const btn = document.createElement('button');
-      btn.className = 'segmented-option';
-      btn.dataset.model = p.id;
-      btn.role = 'radio';
-      btn.setAttribute('aria-checked', 'false');
-      btn.textContent = p.name;
-      modelSegmented.appendChild(btn);
+      const isConfig = !!res[p.storageKey] || (p.isCustom && res[p.storageKey] === '');
+      configured[p.id] = isConfig;
 
-      configured[p.id] = false;
-      
-      const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
-
-      // Create card HTML
-      const cardHTML = `
-        <div class="model-card" id="card-${p.id}">
-          <div class="card-header">
-            <div class="model-icon ${p.cssClass || 'openai'}">
-              ${svgIcon}
-            </div>
-            <div class="model-info">
-              <div class="model-name">${p.name}</div>
-              <div class="model-desc">${p.description}</div>
-            </div>
-            <span class="status-badge not-configured" id="${p.id}-status">Not set</span>
-            ${p.isCustom ? `<button class="delete-custom-btn" data-id="${p.id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
-          </div>
-          <div class="input-group">
-            <label for="${p.id}-api-key">API Key</label>
-            <div class="input-wrapper">
-              <input type="password" id="${p.id}-api-key" placeholder="Paste your ${p.name} API key" autocomplete="off" spellcheck="false">
-              <button class="toggle-visibility" data-target="${p.id}-api-key" title="Toggle visibility">
-                <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-              </button>
-            </div>
-          </div>
-          
-          <div class="input-group">
-            <label for="${p.id}-model">Model</label>
-            <div class="input-wrapper">
-              <select id="${p.id}-model" disabled>
-                <option value="${p.defaultModel}">${p.defaultModel}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="key-hint" id="${p.id}-key-hint" hidden></div>
-          <div class="action-row">
-            <button class="save-btn" id="save-${p.id}-key">
-              <span class="btn-content">${SAVE_ICON} Save</span>
-            </button>
-            <button class="remove-btn" id="remove-${p.id}-key" hidden>Remove</button>
-          </div>
-          
-          ${!p.isCustom ? `
-          <div class="help">
-            <button class="help-toggle" id="${p.id}-help-toggle" aria-expanded="false" aria-controls="${p.id}-help">
-              <span class="help-toggle-label">
-                <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-                ${p.helpTitle}
-              </span>
-              <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
-            </button>
-            <div class="help-body" id="${p.id}-help">
-              <div class="help-body-inner">
-                <ol class="help-steps">
-                  ${p.helpSteps.map(step => `<li>${step}</li>`).join('')}
-                </ol>
-              </div>
-            </div>
-          </div>` : ''}
-        </div>
-      `;
-      
-      providersList.insertAdjacentHTML('beforeend', cardHTML);
-      
-      providerElements[p.id] = {
-        ...p,
-        client: new p.clientClass(p),
-        input: document.getElementById(`${p.id}-api-key`),
-        modelSelect: document.getElementById(`${p.id}-model`),
-        saveBtn: document.getElementById(`save-${p.id}-key`),
-        removeBtn: document.getElementById(`remove-${p.id}-key`),
-        status: document.getElementById(`${p.id}-status`),
-        hint: document.getElementById(`${p.id}-key-hint`),
-        helpToggle: document.getElementById(`${p.id}-help-toggle`),
-        helpBody: document.getElementById(`${p.id}-help`),
-      };
+      if (isConfig) {
+        renderConfiguredCard(p, res);
+      } else {
+        renderUnconfiguredItem(p);
+      }
     });
 
-    const storageKeysToFetch = Object.values(ALL_PROVIDERS).map(p => p.storageKey);
-    const modelKeysToFetch = Object.values(ALL_PROVIDERS).map(p => `${p.id}_MODEL`);
-    storageKeysToFetch.push('SELECTED_MODEL');
-    storageKeysToFetch.push(...modelKeysToFetch);
+    updateBanner();
+    setActiveModel(res.SELECTED_MODEL || 'auto');
+    updateModelSelector();
+    bindDeleteCustomBtns();
+  }
 
-    // Load saved keys and paint each card's state
-    chrome.storage.local.get(storageKeysToFetch, (result) => {
-      Object.values(providerElements).forEach(p => {
-        configured[p.id] = !!result[p.storageKey] || (p.isCustom && result[p.storageKey] === '');
-        applyKeyState(p, result[p.storageKey]);
-        
-        const savedModel = result[`${p.id}_MODEL`];
-        if (configured[p.id]) {
-          // Fetch models to populate dropdown
-          fetchAndPopulateModels(p, result[p.storageKey] || '', savedModel);
-        }
+  function getProviderFormHTML(p, inModal = false) {
+    return `
+      <div class="input-group">
+        <label for="${p.id}-api-key">API Key</label>
+        <div class="input-wrapper">
+          <input type="password" id="${p.id}-api-key" placeholder="Paste your ${p.name} API key" autocomplete="off" spellcheck="false">
+          <button class="toggle-visibility" data-target="${p.id}-api-key" title="Toggle visibility">
+            <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label for="${p.id}-model">Model</label>
+        <div class="input-wrapper">
+          <select id="${p.id}-model" disabled>
+            <option value="${p.defaultModel}">${p.defaultModel}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="key-hint" id="${p.id}-key-hint" hidden></div>
+      <div class="action-row" ${inModal ? 'style="margin-top: 16px;"' : ''}>
+        <button class="save-btn" id="save-${p.id}-key">
+          <span class="btn-content">${SAVE_ICON} Save</span>
+        </button>
+        ${!inModal ? `<button class="remove-btn" id="remove-${p.id}-key" hidden>Remove</button>` : ''}
+      </div>
+      
+      ${(!p.isCustom && !inModal) ? `
+      <div class="help">
+        <button class="help-toggle" id="${p.id}-help-toggle" aria-expanded="false" aria-controls="${p.id}-help">
+          <span class="help-toggle-label">
+            <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            ${p.helpTitle}
+          </span>
+          <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+        </button>
+        <div class="help-body" id="${p.id}-help">
+          <div class="help-body-inner">
+            <ol class="help-steps">
+              ${p.helpSteps.map(step => `<li>${step}</li>`).join('')}
+            </ol>
+          </div>
+        </div>
+      </div>` : ''}
+    `;
+  }
+
+  function renderConfiguredCard(p, res) {
+    const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+
+    const cardHTML = `
+      <div class="model-card" id="card-${p.id}">
+        <div class="card-header">
+          <div class="model-icon ${p.cssClass || 'openai'}">
+            ${svgIcon}
+          </div>
+          <div class="model-info">
+            <div class="model-name">${p.name}</div>
+            <div class="model-desc">${p.description}</div>
+          </div>
+          <span class="status-badge not-configured" id="${p.id}-status">Not set</span>
+          ${p.isCustom ? `<button class="delete-custom-btn" data-id="${p.id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
+        </div>
+        ${getProviderFormHTML(p, false)}
+      </div>
+    `;
+    
+    providersList.insertAdjacentHTML('beforeend', cardHTML);
+    bindProviderLogic(p, res);
+  }
+
+  function renderUnconfiguredItem(p) {
+    const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+    
+    const item = document.createElement('div');
+    item.className = 'command-item';
+    item.innerHTML = `
+      <div class="command-item-icon ${p.cssClass || 'openai'}">${svgIcon}</div>
+      <div class="command-item-name">${p.name}</div>
+    `;
+    
+    item.addEventListener('click', () => {
+      openProviderConfig(p);
+    });
+    
+    unconfiguredProvidersList.appendChild(item);
+  }
+
+  function bindProviderLogic(p, res = null) {
+    providerElements[p.id] = {
+      ...p,
+      client: new p.clientClass(p),
+      input: document.getElementById(`${p.id}-api-key`),
+      modelSelect: document.getElementById(`${p.id}-model`),
+      saveBtn: document.getElementById(`save-${p.id}-key`),
+      removeBtn: document.getElementById(`remove-${p.id}-key`),
+      status: document.getElementById(`${p.id}-status`),
+      hint: document.getElementById(`${p.id}-key-hint`),
+      helpToggle: document.getElementById(`${p.id}-help-toggle`),
+      helpBody: document.getElementById(`${p.id}-help`),
+    };
+
+    const pe = providerElements[p.id];
+    
+    if (res) {
+      applyKeyState(pe, res[p.storageKey]);
+      if (configured[p.id]) {
+        fetchAndPopulateModels(pe, res[p.storageKey] || '', res[`${p.id}_MODEL`]);
+      }
+    }
+
+    pe.saveBtn.addEventListener('click', () => handleSave(pe));
+    if (pe.removeBtn) {
+      pe.removeBtn.addEventListener('click', () => handleRemove(pe));
+    }
+    
+    if (pe.helpToggle) {
+      pe.helpToggle.addEventListener('click', () => {
+        const open = pe.helpToggle.getAttribute('aria-expanded') === 'true';
+        setAccordion(pe, !open);
       });
-
-      updateBanner();
-      setActiveModel(result.SELECTED_MODEL || 'auto');
-      updateModelSegmented();
-      bindProviderEvents();
+    }
+    
+    pe.modelSelect.addEventListener('change', () => {
+      chrome.storage.local.set({ [`${p.id}_MODEL`]: pe.modelSelect.value });
+      showToast('Model saved');
     });
   }
 
+  function openProviderConfig(p) {
+    providerConfigTitle.textContent = p.name;
+    providerConfigBody.innerHTML = getProviderFormHTML(p, true);
+    
+    bindProviderLogic(p, null);
+    
+    providerListView.hidden = true;
+    providerConfigView.hidden = false;
+  }
+
+  function bindDeleteCustomBtns() {
+    document.querySelectorAll('.delete-custom-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.id;
+        deleteCustomProvider(id);
+      });
+    });
+  }
+  
+  let customProvidersList = [];
+
   // Initial load
+
   // Render default providers instantly for snappy UI
-  renderProvidersList([]); 
-  chrome.storage.local.get(['CUSTOM_PROVIDERS'], (res) => {
-    if (res.CUSTOM_PROVIDERS && res.CUSTOM_PROVIDERS.length > 0) {
-      renderProvidersList(res.CUSTOM_PROVIDERS);
-    }
-  });
+  loadAndRenderProviders();
 
   async function fetchAndPopulateModels(p, apiKey, savedModel) {
     p.modelSelect.disabled = true;
@@ -249,17 +328,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function bindProviderEvents() {
-    const modelOptions = Array.from(modelSegmented.querySelectorAll('.segmented-option'));
-
-    modelOptions.forEach((o) => {
-      o.addEventListener('click', () => {
-        if (o.disabled) return;
-        setActiveModel(o.dataset.model);
-        chrome.storage.local.set({ SELECTED_MODEL: o.dataset.model });
-        showToast(`Provider: ${o.textContent}`);
-      });
-    });
-
     Object.values(providerElements).forEach((p) => {
       p.saveBtn.addEventListener('click', () => handleSave(p));
       p.removeBtn.addEventListener('click', () => handleRemove(p));
@@ -283,28 +351,105 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const modelOptions = () => Array.from(modelSegmented.querySelectorAll('.segmented-option'));
+  // --- Model Selector Logic ---
+  let activeModelId = 'auto';
 
   function setActiveModel(model) {
-    modelOptions().forEach((o) =>
-      o.setAttribute('aria-checked', o.dataset.model === model ? 'true' : 'false')
-    );
+    activeModelId = model;
+    
+    if (model === 'auto') {
+      activeModelText.textContent = 'Auto';
+      activeModelIcon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+    } else {
+      const p = ALL_PROVIDERS[model];
+      if (p) {
+        activeModelText.textContent = p.name;
+        activeModelIcon.innerHTML = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+      }
+    }
+    
+    // Update active class in selector list if it's open
+    const items = selectorList.querySelectorAll('.command-item');
+    items.forEach(item => {
+      item.classList.toggle('active', item.dataset.model === activeModelId);
+    });
   }
 
-  function updateModelSegmented() {
-    modelOptions().forEach((o) => {
-      const m = o.dataset.model;
-      if (m === 'auto') return;
-      const ok = !!configured[m];
-      o.disabled = !ok;
-      o.title = ok ? '' : `No ${o.textContent} API key set — add one below`;
-    });
-    const active = modelOptions().find((o) => o.getAttribute('aria-checked') === 'true');
-    if (active && active.disabled) {
+  function updateModelSelector() {
+    const configuredCount = Object.values(configured).filter(v => v).length;
+    
+    // Check if the current active model is disabled
+    if (activeModelId !== 'auto' && !configured[activeModelId]) {
       setActiveModel('auto');
       chrome.storage.local.set({ SELECTED_MODEL: 'auto' });
     }
+    
+    // Hide selector completely if < 2 models are configured
+    if (configuredCount < 2) {
+      modelSelectorContainer.hidden = true;
+    } else {
+      modelSelectorContainer.hidden = false;
+    }
   }
+  
+  // Model Selector Modal Events
+  modelSelectorBtn.addEventListener('click', () => {
+    // Populate modal list
+    selectorList.innerHTML = '';
+    
+    // Auto Option
+    const autoItem = document.createElement('div');
+    autoItem.className = `command-item ${activeModelId === 'auto' ? 'active' : ''}`;
+    autoItem.dataset.model = 'auto';
+    autoItem.innerHTML = `
+      <div class="command-item-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </div>
+      <div class="command-item-name">Auto (Fallbacks between all providers)</div>
+    `;
+    autoItem.addEventListener('click', () => selectModel('auto'));
+    selectorList.appendChild(autoItem);
+    
+    // Configured Providers
+    Object.values(ALL_PROVIDERS).forEach(p => {
+      if (configured[p.id]) {
+        const item = document.createElement('div');
+        item.className = `command-item ${activeModelId === p.id ? 'active' : ''}`;
+        item.dataset.model = p.id;
+        const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+        item.innerHTML = `
+          <div class="command-item-icon ${p.cssClass || 'openai'}">${svgIcon}</div>
+          <div class="command-item-name">${p.name}</div>
+        `;
+        item.addEventListener('click', () => selectModel(p.id));
+        selectorList.appendChild(item);
+      }
+    });
+    
+    selectorSearch.value = '';
+    selectorModal.hidden = false;
+    selectorSearch.focus();
+  });
+  
+  function selectModel(modelId) {
+    setActiveModel(modelId);
+    chrome.storage.local.set({ SELECTED_MODEL: modelId });
+    showToast('Provider updated');
+    selectorModal.hidden = true;
+  }
+  
+  closeSelectorBtn.addEventListener('click', () => {
+    selectorModal.hidden = true;
+  });
+  
+  selectorSearch.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    const items = Array.from(selectorList.querySelectorAll('.command-item'));
+    items.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+  });
 
   // --- Appearance (panel theme) ---
   const themeSegmented = document.getElementById('theme-segmented');
@@ -403,13 +548,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         configured[p.id] = true;
         applyKeyState(p, key);
         updateBanner();
-        updateModelSegmented();
+        updateModelSelector();
         showToast(`${p.name} key saved`);
         chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
         
-        chrome.storage.local.get([`${p.id}_MODEL`], (res) => {
-          fetchAndPopulateModels(p, key, res[`${p.id}_MODEL`]);
-        });
+        providerSetupModal.hidden = true;
+        loadAndRenderProviders();
       }, 400);
     });
   }
@@ -420,11 +564,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       resetVisibility(p.input);
       applyKeyState(p, null);
       updateBanner();
-      updateModelSegmented();
+      updateModelSelector();
       showToast(`${p.name} key removed`);
       chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
-      p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
-      p.modelSelect.disabled = true;
+      loadAndRenderProviders();
     });
   }
 
@@ -439,14 +582,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         p.hint.textContent = `Saved without key`;
       }
       p.hint.hidden = false;
-      p.removeBtn.hidden = false;
+      if (p.removeBtn) p.removeBtn.hidden = false;
       if (p.helpToggle) setAccordion(p, false);
     } else {
       p.input.value = '';
       p.input.classList.remove('secured');
       updateStatus(p.status, false);
       p.hint.hidden = true;
-      p.removeBtn.hidden = true;
+      if (p.removeBtn) p.removeBtn.hidden = true;
       if (p.helpToggle) setAccordion(p, true);
     }
   }
@@ -492,6 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateStatus(badge, state) {
+    if (!badge) return;
     if (state === true) {
       badge.className = 'status-badge configured';
       badge.textContent = 'Active';
@@ -513,32 +657,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // --- Custom Providers Modal Logic ---
-  const addCustomBtn = document.getElementById('add-custom-provider-btn');
-  const customModal = document.getElementById('custom-provider-modal');
-  const closeCustomBtn = document.getElementById('close-modal-btn');
-  const saveCustomBtn = document.getElementById('save-custom-provider-btn');
 
-  // Input fields
-  const cpName = document.getElementById('cp-name');
-  const cpEndpoint = document.getElementById('cp-endpoint');
-  const cpApiKey = document.getElementById('cp-api-key');
-  const cpModels = document.getElementById('cp-models');
-  const cpHeaders = document.getElementById('cp-headers');
+  if (addProviderBtn) {
+    addProviderBtn.addEventListener('click', () => {
+      providerSetupModal.hidden = false;
+      providerListView.hidden = false;
+      providerConfigView.hidden = true;
+    });
+  }
 
-  addCustomBtn.addEventListener('click', () => {
-    cpName.value = '';
-    cpEndpoint.value = '';
-    cpApiKey.value = '';
-    cpModels.value = '';
-    cpHeaders.value = '';
-    customModal.hidden = false;
-  });
+  const hideSetupModal = () => { providerSetupModal.hidden = true; };
+  if (closeProviderSetupBtn) closeProviderSetupBtn.addEventListener('click', hideSetupModal);
+  if (closeProviderConfigBtn) closeProviderConfigBtn.addEventListener('click', hideSetupModal);
 
-  closeCustomBtn.addEventListener('click', () => {
-    customModal.hidden = true;
-  });
+  if (providerConfigBackBtn) {
+    providerConfigBackBtn.addEventListener('click', () => {
+      providerConfigView.hidden = true;
+      providerListView.hidden = false;
+    });
+  }
 
-  saveCustomBtn.addEventListener('click', () => {
+  if (addCustomProviderItem) {
+    addCustomProviderItem.addEventListener('click', () => {
+      providerConfigTitle.textContent = 'Custom Provider';
+      providerConfigBody.innerHTML = '';
+      providerConfigBody.appendChild(customProviderTemplate.content.cloneNode(true));
+      
+      providerListView.hidden = true;
+      providerConfigView.hidden = false;
+      
+      document.getElementById('save-custom-provider-btn').addEventListener('click', handleSaveCustomProvider);
+    });
+  }
+
+
+  function handleSaveCustomProvider() {
+    const cpName = document.getElementById('cp-name');
+    const cpEndpoint = document.getElementById('cp-endpoint');
+    const cpApiKey = document.getElementById('cp-api-key');
+    const cpModels = document.getElementById('cp-models');
+    const cpHeaders = document.getElementById('cp-headers');
     const name = cpName.value.trim();
     let endpoint = cpEndpoint.value.trim();
     if (endpoint && !endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
@@ -594,13 +752,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       chrome.storage.local.set(saveObj, () => {
-        customModal.hidden = true;
-        renderProvidersList(customProviders);
+        providerSetupModal.hidden = true;
+        loadAndRenderProviders();
         showToast('Custom provider added');
         chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
       });
     });
-  });
+  }
 
   function deleteCustomProvider(id) {
     chrome.storage.local.get(['CUSTOM_PROVIDERS'], (res) => {
@@ -611,7 +769,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         customProviders.splice(providerIndex, 1);
         chrome.storage.local.remove([cp.storageKey, `${cp.id}_MODEL`], () => {
           chrome.storage.local.set({ CUSTOM_PROVIDERS: customProviders }, () => {
-            renderProvidersList(customProviders);
+            loadAndRenderProviders();
             showToast('Custom provider deleted');
             chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
           });
