@@ -47,6 +47,15 @@ export class LLMClient {
   }
 
   /**
+   * Fetches the available models for this provider
+   * @param {string} apiKey - The API key for authentication
+   * @returns {Promise<Array<{id: string, name: string}>>} List of models
+   */
+  async fetchModels(apiKey) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
    * Gets the name of the model this client represents
    * @returns {string} The model name
    */
