@@ -17,14 +17,6 @@ const CONSTANTS = {
       }
     }
   },
-  API_ENDPOINTS: {
-    GEMINI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent',
-    MISTRAL: 'https://api.mistral.ai/v1/chat/completions'
-  },
-  MODELS: {
-    GEMINI: 'gemini',
-    MISTRAL: 'mistral'
-  },
   PROMPTS: {
     // Per-video "Detail" density model. Each preset governs ONLY the number of
     // summary points (density), how many section headings group them, and the

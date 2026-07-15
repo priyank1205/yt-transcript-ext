@@ -12,7 +12,8 @@ class MistralClient extends LLMClient {
 
 Here is the transcript: ${transcript}`;
 
-    const response = await fetch(CONSTANTS.API_ENDPOINTS.MISTRAL, {
+    const API_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
+    const response = await fetch(API_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,7 +62,8 @@ Here is the transcript: ${transcript}`;
 
   async validateKey(apiKey) {
     try {
-      const res = await fetch(CONSTANTS.API_ENDPOINTS.MISTRAL, {
+      const API_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
+      const res = await fetch(API_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
