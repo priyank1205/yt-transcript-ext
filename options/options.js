@@ -173,42 +173,77 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Initial load
+  // Render default providers instantly for snappy UI
+  renderProvidersList([]); 
   chrome.storage.local.get(['CUSTOM_PROVIDERS'], (res) => {
-    renderProvidersList(res.CUSTOM_PROVIDERS || []);
+    if (res.CUSTOM_PROVIDERS && res.CUSTOM_PROVIDERS.length > 0) {
+      renderProvidersList(res.CUSTOM_PROVIDERS);
+    }
   });
 
   async function fetchAndPopulateModels(p, apiKey, savedModel) {
-    p.modelSelect.innerHTML = `<option value="">Loading models...</option>`;
     p.modelSelect.disabled = true;
     
-    // For custom providers, we try fetching, but if it fails, we fall back to manual comma-separated models if defined
-    const models = await p.client.fetchModels(apiKey);
-    p.modelSelect.innerHTML = '';
-    
-    let optionsList = models;
-    if (models.length === 0 && p.isCustom && p.modelsList) {
-      optionsList = p.modelsList.split(',').map(m => m.trim()).filter(m => m).map(m => ({ id: m, name: m }));
-    }
-
-    if (optionsList.length === 0) {
-      // Fallback
-      p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
-    } else {
-      optionsList.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.name;
-        p.modelSelect.appendChild(opt);
-      });
-      if (savedModel && optionsList.find(m => m.id === savedModel)) {
-        p.modelSelect.value = savedModel;
-      } else {
-        p.modelSelect.value = p.defaultModel;
-        // if default model is not in the list, pick the first one
-        if (!optionsList.find(m => m.id === p.defaultModel) && optionsList.length > 0) {
-          p.modelSelect.value = optionsList[0].id;
-        }
+    // 1. Try to load from cache first for instant UI
+    const cacheKey = `${p.id}_CACHED_MODELS`;
+    chrome.storage.local.get([cacheKey], async (res) => {
+      let cachedModels = res[cacheKey] || [];
+      
+      // If we have no cache and it's custom with a fallback list
+      if (cachedModels.length === 0 && p.isCustom && p.modelsList) {
+        cachedModels = p.modelsList.split(',').map(m => m.trim()).filter(m => m).map(m => ({ id: m, name: m }));
       }
+
+      // Render cached models immediately
+      if (cachedModels.length === 0) {
+        p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
+      } else {
+        renderSelectOptions(p, cachedModels, savedModel);
+      }
+
+      // 2. Fetch in background to update if we have an API key or if it's a custom provider (which might not need one)
+      if (apiKey || p.isCustom) {
+        // Show loading state ONLY if we had no cache
+        if (cachedModels.length === 0) {
+          p.modelSelect.innerHTML = `<option value="">Loading models...</option>`;
+        }
+        
+        try {
+          const freshModels = await p.client.fetchModels(apiKey);
+          if (freshModels && freshModels.length > 0) {
+            chrome.storage.local.set({ [cacheKey]: freshModels });
+            renderSelectOptions(p, freshModels, savedModel);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch fresh models for ${p.id}`, e);
+          // If fetch fails but we had cache, we just keep the cache.
+          // If we had no cache and fetch fails, fall back to default:
+          if (cachedModels.length === 0) {
+             p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
+             p.modelSelect.disabled = false;
+          }
+        }
+      } else {
+        p.modelSelect.disabled = false;
+      }
+    });
+  }
+
+  function renderSelectOptions(p, modelsList, savedModel) {
+    p.modelSelect.innerHTML = '';
+    modelsList.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      p.modelSelect.appendChild(opt);
+    });
+    
+    if (savedModel && modelsList.find(m => m.id === savedModel)) {
+      p.modelSelect.value = savedModel;
+    } else if (modelsList.find(m => m.id === p.defaultModel)) {
+      p.modelSelect.value = p.defaultModel;
+    } else if (modelsList.length > 0) {
+      p.modelSelect.value = modelsList[0].id;
     }
     p.modelSelect.disabled = false;
   }
@@ -372,7 +407,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast(`${p.name} key saved`);
         chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
         
-        fetchAndPopulateModels(p, key, null);
+        chrome.storage.local.get([`${p.id}_MODEL`], (res) => {
+          fetchAndPopulateModels(p, key, res[`${p.id}_MODEL`]);
+        });
       }, 400);
     });
   }
@@ -503,10 +540,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   saveCustomBtn.addEventListener('click', () => {
     const name = cpName.value.trim();
-    const endpoint = cpEndpoint.value.trim();
-    if (!name || !endpoint) {
+    let endpoint = cpEndpoint.value.trim();
+    if (endpoint && !endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+      endpoint = 'https://' + endpoint;
+    }
+    const modelsList = cpModels.value.trim();
+    if (!name || !endpoint || !modelsList) {
       if (!name) flashInvalid(cpName);
       if (!endpoint) flashInvalid(cpEndpoint);
+      if (!modelsList) flashInvalid(cpModels);
       return;
     }
     
@@ -522,7 +564,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const id = 'custom_' + Date.now();
-    const modelsList = cpModels.value.trim();
     const defaultModel = modelsList ? modelsList.split(',')[0].trim() : 'gpt-3.5-turbo';
 
     const newProvider = {

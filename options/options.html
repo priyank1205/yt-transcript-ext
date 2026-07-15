@@ -41,8 +41,8 @@
 
     /* App shell: sidebar + content */
     .app {
-      width: 100%;
-      max-width: 800px;
+      width: 820px;
+      min-height: 520px;
       display: flex;
       background: #0d0d0f;
       border: 1px solid rgba(255, 255, 255, 0.06);
@@ -729,6 +729,15 @@
     }
 
     .help-steps li strong { color: #fafafa; font-weight: 600; }
+    
+    .help-steps a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    
+    .help-steps a:hover {
+      text-decoration: underline;
+    }
 
     .help-note {
       font-size: 11.5px;
@@ -781,7 +790,14 @@
       font-weight: 500;
       font-family: inherit;
       text-align: left;
-      cursor: not-allowed;
+      cursor: pointer !important;
+      transition: all 0.2s ease;
+    }
+    
+    .add-provider:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fafafa;
     }
 
     .add-provider svg {
@@ -816,9 +832,9 @@
     }
 
     .privacy-note svg {
-      width: 16px;
-      height: 16px;
-      fill: #a1a1aa;
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
     }
 
     /* Modal Styles */
@@ -1212,38 +1228,40 @@
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Add Custom Provider
         </button>
-      </div>
       
       <!-- Custom Provider Modal -->
       <div id="custom-provider-modal" class="modal-overlay" hidden>
         <div class="modal-content">
           <div class="modal-header">
-            <h3>Add Custom Provider</h3>
+            <div>
+              <h3>Add Custom Provider</h3>
+              <div style="font-size: 12px; color: #71717a; margin-top: 4px;">For OpenAI-compatible APIs (e.g. LM Studio, OpenRouter)</div>
+            </div>
             <button class="close-modal" id="close-modal-btn">
               <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
           </div>
           <div class="modal-body">
             <div class="input-group">
-              <label for="cp-name">Display Name</label>
+              <label for="cp-name">Display Name (Required)</label>
               <div class="input-wrapper">
                 <input type="text" id="cp-name" placeholder="e.g. DeepSeek or Local LM Studio">
               </div>
             </div>
             <div class="input-group">
-              <label for="cp-endpoint">Base URL (Endpoint)</label>
+              <label for="cp-endpoint">Base URL / Endpoint (Required)</label>
               <div class="input-wrapper">
                 <input type="text" id="cp-endpoint" placeholder="e.g. https://api.deepseek.com/v1/chat/completions">
               </div>
             </div>
             <div class="input-group">
-              <label for="cp-api-key">API Key (Optional for local)</label>
+              <label for="cp-api-key">API Key (Optional for local models)</label>
               <div class="input-wrapper">
                 <input type="password" id="cp-api-key" placeholder="Your API key" autocomplete="off">
               </div>
             </div>
             <div class="input-group">
-              <label for="cp-models">Models (Comma separated)</label>
+              <label for="cp-models">Models (Comma separated) (Required)</label>
               <div class="input-wrapper">
                 <input type="text" id="cp-models" placeholder="e.g. deepseek-chat, deepseek-coder">
               </div>
