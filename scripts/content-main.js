@@ -20,6 +20,10 @@ function initApp() {
         if (changes.THEME_PREF && typeof setPanelThemePref === 'function') {
             setPanelThemePref(changes.THEME_PREF.newValue || 'system');
         }
+        // Design skin changed (Classic vs Quiet preview): re-skin the panel live.
+        if (changes.PANEL_SKIN && typeof setPanelSkinPref === 'function') {
+            setPanelSkinPref(changes.PANEL_SKIN.newValue || 'quiet');
+        }
     });
 
     // Initial check

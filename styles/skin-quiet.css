@@ -1,0 +1,748 @@
+/* styles/skin-quiet.css
+   ==========================================================================
+   "Quiet" skin — the redesigned panel (direction B: quiet premium), opt-in
+   via the PANEL_SKIN preference while it's evaluated against Classic.
+
+   Every rule is scoped under `.yt-timestamps-container.yt-skin-quiet`, so
+   removing that class restores Classic untouched. This file MUST load after
+   content.css (manifest css order): equal-specificity ties are resolved by
+   file order, and several Classic rules are matched at equal specificity on
+   purpose. `!important` appears only where the Classic rule being overridden
+   uses it.
+
+   Design rules this skin encodes:
+   - One red per theme (--q-accent), used only for the primary action and
+     small meaningful accents (seek confirmation, active time).
+   - Surfaces over strokes: hairline dividers, no card borders, panel sits a
+     step LIGHTER than YouTube's dark page.
+   - Two font weights (400/500); hierarchy via size + color.
+   - Delight through fast, purposeful motion — no ambient shimmer/glow.
+   ========================================================================== */
+
+/* --- Design tokens ------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet {
+  --q-surface: #181818;
+  --q-raised: #212121;
+  --q-border: rgba(255, 255, 255, 0.09);
+  --q-divider: rgba(255, 255, 255, 0.06);
+  --q-hover: rgba(255, 255, 255, 0.05);
+  --q-chip: rgba(255, 255, 255, 0.08);
+  --q-chip-hover: rgba(255, 255, 255, 0.13);
+  --q-text-1: #f1f1f1;
+  --q-text-2: #aaaaaa;
+  --q-text-3: #8a8a8a;
+  --q-accent: #cc0000;
+  --q-accent-hover: #e01b1b;
+  --q-accent-text: #ff5c5c;
+  --q-accent-tint: rgba(255, 70, 70, 0.12);
+  --q-accent-pulse: rgba(255, 70, 70, 0.13);
+  --q-on-accent: #ffffff;
+  --q-ghost: rgba(255, 255, 255, 0.07);
+  --q-track: #2a2a2a;
+  --q-dot: #4f4f4f;
+  --q-thumb-bg: #ececec;
+  --q-thumb-border: transparent;
+  --q-thumb-text: #141414;
+  --q-spinner-track: rgba(255, 255, 255, 0.25);
+  --q-spinner-head: #ffffff;
+  --q-focus: rgba(255, 92, 92, 0.5);
+  --q-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --q-pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --q-scrollbar: rgba(255, 255, 255, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light.yt-skin-quiet {
+  --q-surface: #ffffff;
+  --q-raised: #ffffff;
+  --q-border: #e5e5e5;
+  --q-divider: rgba(0, 0, 0, 0.07);
+  --q-hover: rgba(0, 0, 0, 0.035);
+  --q-chip: rgba(0, 0, 0, 0.05);
+  --q-chip-hover: rgba(0, 0, 0, 0.09);
+  --q-text-1: #0f0f0f;
+  --q-text-2: #606060;
+  --q-text-3: #909090;
+  --q-accent: #cc0000;
+  --q-accent-hover: #b00000;
+  --q-accent-text: #cc0000;
+  --q-accent-tint: rgba(204, 0, 0, 0.07);
+  --q-accent-pulse: rgba(204, 0, 0, 0.08);
+  --q-on-accent: #ffffff;
+  --q-ghost: rgba(0, 0, 0, 0.06);
+  --q-track: #ececec;
+  --q-dot: #c8c8c8;
+  --q-thumb-bg: #ffffff;
+  --q-thumb-border: #d0d0d0;
+  --q-thumb-text: #0f0f0f;
+  --q-spinner-track: rgba(0, 0, 0, 0.15);
+  --q-spinner-head: #606060;
+  --q-focus: rgba(204, 0, 0, 0.35);
+  --q-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --q-pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --q-scrollbar: rgba(0, 0, 0, 0.2);
+}
+
+/* --- Panel shell ---------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel {
+  background: var(--q-surface);
+  border: 1px solid var(--q-border);
+  border-radius: 12px;
+  box-shadow: var(--q-shadow);
+}
+
+/* --- Header ---------------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header {
+  background: var(--q-surface);
+  border-bottom: 1px solid var(--q-divider);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  padding: 12px 16px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-toggle-icon {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .gear-icon {
+  color: var(--q-text-3);
+  opacity: 1;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .gear-icon:hover {
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .yt-reset-btn {
+  color: var(--q-text-3);
+  opacity: 1;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .yt-reset-btn:hover {
+  color: var(--q-accent-text);
+}
+
+/* Detail chip — borderless filled pill, the YouTube chip idiom */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip {
+  background: var(--q-chip);
+  border: 1px solid transparent;
+  color: var(--q-text-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip:hover {
+  background: var(--q-chip-hover);
+  border-color: transparent;
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip.open {
+  background: var(--q-chip-hover);
+  border-color: transparent;
+  color: var(--q-text-1);
+}
+
+/* Read-only badge on the generated-summary header: no hover lift */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-chip-static:hover {
+  background: var(--q-chip);
+  border-color: transparent;
+  color: var(--q-text-2);
+}
+
+/* --- Empty state: ghost preview of the output ------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-empty-state {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 10px 0 6px;
+  text-align: center;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-ghost-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-ghost-chip {
+  width: 48px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--q-ghost);
+  flex-shrink: 0;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-ghost-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--q-ghost);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-empty-text {
+  color: var(--q-text-3);
+  font-size: 12px;
+  padding: 10px 16px 0;
+}
+
+/* While generating, the ghosts breathe — staggered down the rows so the
+   preview reads as "being filled in", paired with the hairline loader. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating .yt-ghost-chip,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating .yt-ghost-bar {
+  animation: ytGhostPulse 1.3s ease-in-out infinite;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating .yt-ghost-row:nth-child(2) .yt-ghost-chip,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating .yt-ghost-row:nth-child(2) .yt-ghost-bar {
+  animation-delay: 0.18s;
+}
+
+@keyframes ytGhostPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* --- Generate button: neutral tonal, earns its accent on hover --------------- */
+
+.yt-timestamps-container.yt-skin-quiet #action-area {
+  padding: 6px 16px 16px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button {
+  background: var(--q-chip);
+  color: var(--q-text-1);
+  border: none;
+  border-radius: 8px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+/* Kill the Classic shimmer sweep */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button::before {
+  content: none;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button:hover {
+  background: var(--q-accent-tint);
+  color: var(--q-accent-text);
+}
+
+/* Press feedback: quick, physical */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button:active {
+  transform: scale(0.985);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button:disabled {
+  opacity: 0.75;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-generate-button:disabled:hover {
+  background: var(--q-chip);
+  color: var(--q-text-1);
+  border: none;
+}
+
+/* Error state: neutral fill drains away, message reads in accent text */
+.yt-timestamps-container.yt-skin-quiet .yt-error-state {
+  background: transparent !important;
+  color: var(--q-accent-text) !important;
+  box-shadow: inset 0 0 0 1px var(--q-focus);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-state:hover {
+  background: transparent !important;
+}
+
+/* Spinner sits on the tonal fill */
+.yt-timestamps-container.yt-skin-quiet .yt-spinner {
+  border-color: var(--q-spinner-track);
+  border-top-color: var(--q-spinner-head);
+}
+
+/* While generating: an indeterminate red hairline sweeps the panel's top edge
+   (the panel's overflow:hidden keeps it inside the rounded corners). The
+   yt-generating class is set by updateGenerateButton in ui-builder.js. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-generating::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--q-accent-text), transparent);
+  animation: ytQuietProgress 1.2s ease-in-out infinite;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Completion moment: one last full-width pass of the hairline, then gone.
+   One-shot yt-done-sweep class, added on 'done' and removed by a timeout. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel.yt-done-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--q-accent-text), transparent);
+  animation: ytQuietProgress 0.55s cubic-bezier(0.4, 0, 0.2, 1) 1 both;
+  z-index: 5;
+  pointer-events: none;
+}
+
+@keyframes ytQuietProgress {
+  from { left: -40%; }
+  to { left: 100%; }
+}
+
+/* --- Summary list ------------------------------------------------------------ */
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-list {
+  padding: 2px 0 10px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-section-header {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--q-text-3) !important;
+  opacity: 1 !important;
+  letter-spacing: 0.7px !important;
+  padding: 20px 16px 6px !important;
+  border-bottom: none !important;
+  margin: 0 !important;
+}
+
+/* Rows: full-bleed, no cards — hierarchy from type and spacing */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 12px 16px;
+  transition: background 0.15s ease;
+}
+
+/* Hairline divider between consecutive rows (the collapsed accordion element
+   always sits between two rows, so this matches every row after the first in
+   a section; rows that directly follow a section header stay divider-free). */
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-content + .yt-timestamp-item {
+  border-top: 1px solid var(--q-divider);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:hover {
+  background: var(--q-hover);
+}
+
+/* Neutralize Classic-light's dusty-pink open-row tint */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:has(+ .yt-accordion-content.expanded) {
+  background: transparent;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-glow-border {
+  display: none;
+}
+
+/* Timestamp: a quiet chip — reads as a tappable control without shouting */
+.yt-timestamps-container.yt-skin-quiet .yt-time {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--q-text-2) !important;
+  background: var(--q-chip);
+  padding: 3px 9px;
+  margin-right: 12px;
+  min-width: 50px;
+  box-sizing: border-box;
+  text-align: center;
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Digits in their own layer so they can nudge aside for the play glyph */
+.yt-timestamps-container.yt-skin-quiet .yt-time-text {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.18s ease;
+}
+
+/* Tiny play triangle, hidden until the row is hovered */
+.yt-timestamps-container.yt-skin-quiet .yt-time::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transform: translateY(-50%) scale(0.6);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.18s ease;
+}
+
+/* The accent earns its keep: hovering a row tints the chip, slides the play
+   glyph in, and nudges the digits over — "this seeks the video" */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:hover .yt-time,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-row-open .yt-time {
+  background: var(--q-accent-tint);
+  color: var(--q-accent-text) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:hover .yt-time::before {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:hover .yt-time-text {
+  transform: translateX(3px);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-title {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: var(--q-text-1) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-row-open .yt-title,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:has(+ .yt-accordion-content.expanded) .yt-title {
+  font-weight: 500 !important;
+  color: var(--q-text-1) !important;
+}
+
+/* Expand affordance: springy chevron instead of the +/− glyph (the button's
+   text is hidden via font-size 0; the chevron is drawn as a rotated corner). */
+.yt-timestamps-container.yt-skin-quiet .yt-expand-btn {
+  font-size: 0 !important;
+  color: var(--q-text-3) !important;
+  padding: 8px 10px !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-expand-btn::after {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item:hover .yt-expand-btn {
+  color: var(--q-text-1) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-expand-btn.yt-open::after {
+  transform: rotate(-135deg);
+}
+
+/* Expanded description: full-width text block with a thin left rule tying it
+   to its row — no nested box, no dead gutter. Expansion uses Chrome's native
+   height interpolation (height: 0 → auto) instead of Classic's rubbery
+   max-height transition; the max-height caps are neutralized. */
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-content {
+  interpolate-size: allow-keywords;
+  height: 0;
+  max-height: none !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: 2px solid var(--q-divider) !important;
+  border-radius: 0 !important;
+  color: var(--q-text-2) !important;
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+  margin: 0 0 0 16px !important;
+  padding: 0 16px 0 12px !important;
+  transition: height 0.2s cubic-bezier(0.2, 0, 0.2, 1), padding 0.2s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.16s ease 0.04s !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-content.expanded {
+  height: auto;
+  max-height: none !important;
+  padding: 2px 16px 14px 12px !important;
+}
+
+/* --- Delight: entrance cascade + seek confirmation --------------------------- */
+
+/* Rows and section headers cascade in when a summary renders. --yt-i is the
+   render-order index set by ui-builder.js; the delay is capped so long
+   summaries don't keep the tail waiting. */
+.yt-timestamps-container.yt-skin-quiet .yt-section-header,
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item {
+  animation: ytQuietIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: min(calc(var(--yt-i, 0) * 35ms), 490ms);
+}
+
+@keyframes ytQuietIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Click-to-seek confirmation: a brief accent wash over the clicked row.
+   Runs on ::before so it can't collide with the row's entrance animation. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-seek-pulse::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--q-accent-pulse);
+  animation: ytQuietPulseFade 0.55s ease-out both;
+  pointer-events: none;
+}
+
+@keyframes ytQuietPulseFade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* --- Detail popover ----------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop {
+  background: var(--q-raised);
+  border-color: var(--q-border);
+  box-shadow: var(--q-pop-shadow);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-label {
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-value {
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-cap {
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-help-btn {
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-help-btn:hover,
+.yt-timestamps-container.yt-skin-quiet .yt-detail-help-btn.active {
+  color: var(--q-text-1);
+  background: var(--q-hover);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-track {
+  background: var(--q-track);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-dot {
+  background: var(--q-dot);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-dot.active {
+  background: var(--q-dot);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-thumb {
+  background: var(--q-thumb-bg);
+  border: 1px solid var(--q-thumb-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-track:hover .yt-detail-thumb {
+  background: var(--q-thumb-bg);
+  border-color: var(--q-thumb-border);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-track:focus-visible .yt-detail-thumb {
+  box-shadow: 0 0 0 2px var(--q-focus), 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-help {
+  border-top-color: var(--q-divider);
+  color: var(--q-text-2);
+}
+
+/* --- Detail slider v2 (Quiet-only markup, built by buildDetailChip) ----------
+   Effort-style: a labeled lozenge thumb that free-tracks the pointer and
+   spring-snaps to detents on release; level names sit under the track. */
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 {
+  width: 264px;
+  padding: 14px 16px 16px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-top {
+  margin-bottom: 12px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track {
+  height: 34px;
+  border-radius: 10px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-dot {
+  width: 4px;
+  height: 4px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-dot.active {
+  background: var(--q-accent-text);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-thumb {
+  width: 74px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.35s cubic-bezier(0.3, 1.5, 0.55, 1), transform 0.15s ease;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-thumb-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--q-thumb-text);
+  user-select: none;
+}
+
+/* The track auto-focuses when the popover opens; a loud ring on the thumb at
+   rest reads as noise. Keep keyboard affordance as a faint ring on the track
+   groove itself instead. */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track:focus-visible .yt-detail-thumb {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track:focus-visible {
+  box-shadow: 0 0 0 1px var(--q-border);
+}
+
+/* While dragging: the thumb follows the pointer raw (no left transition) and
+   scales up slightly — a grabbed, physical feel. Released, the transition
+   above spring-snaps it onto the detent. */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-track.dragging .yt-detail-thumb {
+  transition: transform 0.15s ease;
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+/* Level names under the track at their detent positions */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-levels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level {
+  background: none;
+  border: none;
+  padding: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--q-text-3);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level:hover {
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-level.active {
+  color: var(--q-text-1);
+}
+
+/* Always-visible one-liner for the current level, crossfading on change */
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-desc {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-detail-pop-v2 .yt-detail-desc.yt-desc-in {
+  animation: ytQuietDescIn 0.18s ease;
+}
+
+@keyframes ytQuietDescIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Title tooltip -------------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-title-tooltip {
+  background: var(--q-raised);
+  border-color: var(--q-border);
+  color: var(--q-text-1);
+  box-shadow: var(--q-pop-shadow);
+}
+
+/* --- First-run settings hint ----------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint {
+  background: var(--q-raised) !important;
+  border-color: var(--q-border) !important;
+  box-shadow: var(--q-pop-shadow) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-arrow {
+  background: var(--q-raised) !important;
+  border-left-color: var(--q-border) !important;
+  border-top-color: var(--q-border) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-title {
+  color: var(--q-text-1) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-text {
+  color: var(--q-text-2) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-dismiss {
+  background: var(--q-accent) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-dismiss:hover {
+  background: var(--q-accent-hover) !important;
+}
+
+/* --- Scrollbar polish -------------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-accordion-body::-webkit-scrollbar-thumb {
+  background: var(--q-scrollbar);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}

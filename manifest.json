@@ -37,7 +37,7 @@
     {
       "matches": ["*://*.youtube.com/*"],
       "js": ["scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
-      "css": ["styles/content.css"]
+      "css": ["styles/content.css", "styles/skin-quiet.css"]
     }
   ]
 }
