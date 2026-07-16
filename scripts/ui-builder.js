@@ -63,6 +63,41 @@ function setPanelThemePref(pref) {
     applyPanelTheme(_themePref);
 }
 
+// --- Panel skin (classic / quiet) ------------------------------------------
+// Design-direction toggle: the redesigned "Quiet" skin (styles/skin-quiet.css)
+// is opt-in via the PANEL_SKIN preference while it's being evaluated. 'classic'
+// (no class) stays the shipping default; 'quiet' adds `yt-skin-quiet` to the
+// container, which the skin stylesheet scopes every override under.
+let _skinPref = 'classic';
+
+function applyPanelSkin(pref, containerEl) {
+    const container = containerEl || document.querySelector('.yt-timestamps-container');
+    if (!container) return;
+    container.classList.toggle('yt-skin-quiet', pref === 'quiet');
+}
+
+// Update the stored preference and re-apply (called when the override changes).
+// The skins differ in markup, not just CSS (Quiet builds the ghost-preview
+// empty state and the v2 Detail slider), so a live toggle also rebuilds the
+// panel contents for the new skin.
+function setPanelSkinPref(pref) {
+    _skinPref = pref || 'classic';
+    applyPanelSkin(_skinPref);
+
+    const container = document.querySelector('.yt-timestamps-container');
+    if (!container) return;
+    // Don't tear down an in-flight generation; the next render (summary or
+    // error reset) will already use the new skin's markup.
+    const genBtn = container.querySelector('.yt-timestamps-generate-button');
+    if (genBtn && genBtn.disabled) return;
+    const cached = getCachedSummary(getCurrentVideoId());
+    if (container.classList.contains('yt-has-summary') && cached) {
+        renderTimestampsUI(cached);
+    } else if (!container.classList.contains('yt-has-summary')) {
+        renderEmptyState(container);
+    }
+}
+
 // Follow live YouTube theme toggles while the override is on 'system'.
 function ensureYtThemeObserver() {
     if (_ytThemeObserver) return;
@@ -182,9 +217,9 @@ function disconnectPlayerObserver() {
 // Standard is the out-of-the-box default; after that, SUMMARY_LENGTH holds
 // whatever level the user last *generated* with, and that becomes the default.
 const DETAIL_OPTIONS = [
-    { value: 'brief', label: 'Brief', help: 'A high-level skim — only the major sections and clear topic shifts, one short line each. Best for a quick sense of what a video covers.' },
-    { value: 'standard', label: 'Standard', help: 'A balanced overview — roughly one point every few minutes, each captured in a sentence or two. The best default for most videos.' },
-    { value: 'detailed', label: 'In-depth', help: 'A thorough breakdown — every distinct topic with concrete specifics like names, numbers, and examples, so you rarely need to watch the video.' }
+    { value: 'brief', label: 'Brief', short: 'Major sections only — a quick skim.', help: 'A high-level skim — only the major sections and clear topic shifts, one short line each. Best for a quick sense of what a video covers.' },
+    { value: 'standard', label: 'Standard', short: 'Balanced coverage — the best default.', help: 'A balanced overview — roughly one point every few minutes, each captured in a sentence or two. The best default for most videos.' },
+    { value: 'detailed', label: 'In-depth', short: 'Every topic, with concrete specifics.', help: 'A thorough breakdown — every distinct topic with concrete specifics like names, numbers, and examples, so you rarely need to watch the video.' }
 ];
 const DETAIL_DEFAULT_INDEX = 1;
 
@@ -209,9 +244,15 @@ function buildDetailChip() {
     let dragging = false;
     const lastIndex = DETAIL_OPTIONS.length - 1;
 
+    // Skin variant, decided at build time. Quiet builds the v2 popover: labeled
+    // lozenge thumb, level labels under the track, always-visible one-line
+    // description, free-tracking drag with a spring snap on release.
+    const quiet = _skinPref === 'quiet';
+
     // Thumb width (must match CSS). Positions are inset by half the thumb so the
     // thumb sits fully inside the track at the extremes instead of clipping.
-    const THUMB_W = 46;
+    // The v2 thumb is wider because it carries the current level's name.
+    const THUMB_W = quiet ? 74 : 46;
     const posLeft = (frac) => `calc(${THUMB_W / 2}px + (100% - ${THUMB_W}px) * ${frac})`;
     const fracOf = (i) => (lastIndex ? i / lastIndex : 0);
 
@@ -239,7 +280,7 @@ function buildDetailChip() {
 
     // --- Popover (Effort-style slider), mounted on open ---
     const pop = document.createElement('div');
-    pop.className = 'yt-detail-pop';
+    pop.className = quiet ? 'yt-detail-pop yt-detail-pop-v2' : 'yt-detail-pop';
     pop.setAttribute('role', 'dialog');
     pop.setAttribute('aria-label', 'Summary detail');
     pop.hidden = true;
@@ -259,7 +300,8 @@ function buildDetailChip() {
     const value = document.createElement('span');
     value.className = 'yt-detail-value';
     titleGroup.appendChild(label);
-    titleGroup.appendChild(value);
+    // v2 shows the current level inside the thumb instead of the title row.
+    if (!quiet) titleGroup.appendChild(value);
 
     const helpBtn = document.createElement('button');
     helpBtn.type = 'button';
@@ -302,7 +344,40 @@ function buildDetailChip() {
 
     const thumb = document.createElement('div');
     thumb.className = 'yt-detail-thumb';
+    // v2: the thumb carries the current level's name.
+    let thumbLabel = null;
+    if (quiet) {
+        thumbLabel = document.createElement('span');
+        thumbLabel.className = 'yt-detail-thumb-label';
+        thumb.appendChild(thumbLabel);
+    }
     track.appendChild(thumb);
+
+    // v2: level names under the track at their detent positions (click to
+    // select), plus an always-visible one-line description that crossfades.
+    let levelEls = [];
+    let desc = null;
+    if (quiet) {
+        const levels = document.createElement('div');
+        levels.className = 'yt-detail-levels';
+        levelEls = DETAIL_OPTIONS.map((opt, i) => {
+            const lvl = document.createElement('button');
+            lvl.type = 'button';
+            lvl.className = 'yt-detail-level';
+            lvl.textContent = opt.label;
+            lvl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                select(i);
+            });
+            levels.appendChild(lvl);
+            return lvl;
+        });
+
+        desc = document.createElement('div');
+        desc.className = 'yt-detail-desc';
+
+        var quietLevels = levels;
+    }
 
     // Longer per-level explanation, toggled by the "?" icon.
     const help = document.createElement('div');
@@ -310,19 +385,39 @@ function buildDetailChip() {
     help.hidden = true;
 
     pop.appendChild(top);
-    pop.appendChild(caps);
+    if (!quiet) pop.appendChild(caps);
     pop.appendChild(track);
+    if (quiet) {
+        pop.appendChild(quietLevels);
+        pop.appendChild(desc);
+    }
     pop.appendChild(help);
 
     function render() {
         const opt = DETAIL_OPTIONS[index];
-        thumb.style.left = posLeft(fracOf(index));
+        // While a v2 drag is live the thumb tracks the pointer freely; the
+        // detent position is applied on release (spring snap).
+        if (!(quiet && dragging)) {
+            thumb.style.left = posLeft(fracOf(index));
+        }
         chipLabel.textContent = opt.label;
         value.textContent = opt.label;
         help.textContent = opt.help;
         track.setAttribute('aria-valuenow', String(index));
         track.setAttribute('aria-valuetext', opt.label);
         dots.forEach((d, i) => d.classList.toggle('active', i === index));
+        if (quiet) {
+            thumbLabel.textContent = opt.label;
+            levelEls.forEach((el, i) => el.classList.toggle('active', i === index));
+            // Crossfade the one-liner only when it actually changes (remove +
+            // reflow restarts the entrance animation).
+            if (desc.textContent !== opt.short) {
+                desc.textContent = opt.short;
+                desc.classList.remove('yt-desc-in');
+                void desc.offsetWidth;
+                desc.classList.add('yt-desc-in');
+            }
+        }
     }
 
     function select(i) {
@@ -343,19 +438,42 @@ function buildDetailChip() {
         return Math.round(frac * lastIndex);
     }
 
+    // v2 drag feel: the thumb follows the pointer freely (clamped inside the
+    // track) while the nearest level stays selected live; classic snaps the
+    // thumb detent-to-detent as before.
+    function thumbToPointer(clientX) {
+        const rect = track.getBoundingClientRect();
+        const half = THUMB_W / 2;
+        const x = Math.min(rect.width - half, Math.max(half, clientX - rect.left));
+        thumb.style.left = `${x}px`;
+    }
+
     track.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
         dragging = true;
         try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        if (quiet) {
+            track.classList.add('dragging');
+            thumbToPointer(e.clientX);
+        }
         select(indexFromClientX(e.clientX));
     });
     track.addEventListener('pointermove', (e) => {
-        if (dragging) select(indexFromClientX(e.clientX));
+        if (!dragging) return;
+        if (quiet) thumbToPointer(e.clientX);
+        select(indexFromClientX(e.clientX));
     });
     const endDrag = (e) => {
+        if (!dragging) return;
         dragging = false;
         try { track.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (quiet) {
+            // Release: spring-snap to the selected detent (the `dragging` class
+            // held the left-transition off while tracking the pointer).
+            track.classList.remove('dragging');
+            thumb.style.left = posLeft(fracOf(index));
+        }
     };
     track.addEventListener('pointerup', endDrag);
     track.addEventListener('pointercancel', endDrag);
@@ -511,15 +629,27 @@ function renderEmptyState(container) {
 
     const emptyState = document.createElement('div');
     emptyState.className = 'yt-timestamps-empty-state';
-    emptyState.innerHTML = `
-        <div class="yt-empty-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-            </svg>
-        </div>
-        <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
-    `;
+    if (_skinPref === 'quiet') {
+        // Quiet: a faint "ghost preview" of the output itself — placeholder
+        // section label + rows that shimmer while a summary is generating.
+        emptyState.innerHTML = `
+            <div class="yt-ghost-preview" aria-hidden="true">
+                <div class="yt-ghost-row"><span class="yt-ghost-chip"></span><span class="yt-ghost-bar" style="width: 76%"></span></div>
+                <div class="yt-ghost-row"><span class="yt-ghost-chip"></span><span class="yt-ghost-bar" style="width: 58%"></span></div>
+            </div>
+            <div class="yt-empty-text">Chapters with AI summaries, linked to the video</div>
+        `;
+    } else {
+        emptyState.innerHTML = `
+            <div class="yt-empty-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </div>
+            <div class="yt-empty-text">Generate an AI-powered summary with timestamps</div>
+        `;
+    }
     panelBody.appendChild(emptyState);
 
     // Create action area element
@@ -550,11 +680,20 @@ function renderEmptyState(container) {
     // Re-apply after a short delay to catch late layout shifts
     setTimeout(applyPlayerHeight, 500);
 
-    // Load the theme preference and keep the panel in sync with live YouTube
-    // theme toggles (when following the system).
-    chrome.storage.local.get(['THEME_PREF'], (res) => {
+    // Load the theme + skin preferences and keep the panel in sync with live
+    // YouTube theme toggles (when following the system). The skin affects the
+    // markup built above (ghost preview, Detail slider variant), so if the
+    // stored skin differs from the one this render assumed, rebuild once with
+    // the right one — the re-entrant call sees the matching pref and settles.
+    const renderedSkin = _skinPref;
+    chrome.storage.local.get(['THEME_PREF', 'PANEL_SKIN'], (res) => {
         _themePref = res.THEME_PREF || 'system';
         applyPanelTheme(_themePref, container);
+        _skinPref = res.PANEL_SKIN || 'quiet';
+        applyPanelSkin(_skinPref, container);
+        if (_skinPref !== renderedSkin) {
+            renderEmptyState(container);
+        }
     });
 
     // First-run onboarding: point new users to the settings gear icon
@@ -572,8 +711,11 @@ function injectSidebar(secondary) {
     // Create container element
     const container = document.createElement('div');
     container.className = 'yt-timestamps-container';
-    // Apply the theme up-front (follows YouTube by default) to avoid a flash
+    // Apply the theme up-front (follows YouTube by default) to avoid a flash.
+    // The skin uses the in-memory pref so SPA re-injects don't flash Classic
+    // while the async storage read in renderEmptyState resolves.
     applyPanelTheme('system', container);
+    applyPanelSkin(_skinPref, container);
 
     // Insert container into secondary, then build the empty state inside it
     secondary.insertBefore(container, secondary.firstChild);
@@ -712,7 +854,9 @@ function setGenerateButtonMode(genBtn) {
             genBtn.textContent = 'Generate summary';
             genBtn.classList.remove('yt-needs-keys');
             genBtn.onclick = runAnalysis;
-            if (emptyText) emptyText.textContent = 'Generate an AI-powered summary with timestamps';
+            if (emptyText) emptyText.textContent = _skinPref === 'quiet'
+                ? 'Chapters with AI summaries, linked to the video'
+                : 'Generate an AI-powered summary with timestamps';
         } else {
             genBtn.textContent = 'Set API keys';
             genBtn.classList.add('yt-needs-keys');
@@ -732,7 +876,21 @@ function refreshGenerateButtonMode() {
 
 // Function to update the generate button state
 let _buttonResetTimeout = null;
+let _sweepTimeout = null;
 function updateGenerateButton(phase, message, keepOpen) {
+    const panel = _getPanel();
+
+    // 'done' usually arrives after the summary has replaced the empty state
+    // (so the generate button is gone): fire the Quiet skin's completion sweep
+    // on whatever panel is showing, then fall through to the button logic for
+    // the cases where the button still exists.
+    if (phase === 'done' && panel) {
+        panel.classList.remove('yt-generating');
+        panel.classList.add('yt-done-sweep');
+        clearTimeout(_sweepTimeout);
+        _sweepTimeout = setTimeout(() => panel.classList.remove('yt-done-sweep'), 900);
+    }
+
     const genBtn = document.querySelector('.yt-timestamps-generate-button');
     if (!genBtn) return;
 
@@ -754,15 +912,18 @@ function updateGenerateButton(phase, message, keepOpen) {
             genBtn.disabled = true;
             genBtn.classList.remove('yt-error-state');
             genBtn.innerHTML = '<span class="yt-spinner"></span>Extracting transcript...';
+            if (panel) panel.classList.add('yt-generating');
             break;
         case 'calling_api':
             genBtn.disabled = true;
             genBtn.classList.remove('yt-error-state');
             genBtn.innerHTML = '<span class="yt-spinner"></span>Generating summary...';
+            if (panel) panel.classList.add('yt-generating');
             break;
         case 'error':
             genBtn.classList.add('yt-error-state');
             genBtn.innerHTML = message || 'Something went wrong';
+            if (panel) panel.classList.remove('yt-generating');
             if (keepOpen) {
                 genBtn.disabled = true;
                 genBtn.style.pointerEvents = 'none';
@@ -893,6 +1054,10 @@ function renderTimestampsUI(summaryText) {
     // Process summary text
     const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
     let itemCount = 0;
+    // Render order index, set as a CSS custom property on each section header
+    // and row. Classic ignores it; the Quiet skin uses it to stagger the
+    // entrance cascade when a summary first renders.
+    let orderIndex = 0;
 
     lines.forEach(line => {
         // Normalize common LLM formatting drift so valid points aren't silently
@@ -906,6 +1071,7 @@ function renderTimestampsUI(summaryText) {
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'yt-section-header';
             sectionHeader.textContent = cleanLine.substring(1).trim();
+            sectionHeader.style.setProperty('--yt-i', orderIndex++);
             timestampsList.appendChild(sectionHeader);
             return;
         }
@@ -927,14 +1093,15 @@ function renderTimestampsUI(summaryText) {
             
             const tsDiv = document.createElement('div');
             tsDiv.className = 'yt-timestamp-item';
-            
+            tsDiv.style.setProperty('--yt-i', orderIndex++);
+
             const glowBorder = document.createElement('div');
             glowBorder.className = 'yt-glow-border';
             tsDiv.appendChild(glowBorder);
             
             const timeLabel = document.createElement('span');
             timeLabel.className = 'yt-time-label';
-            timeLabel.innerHTML = `<span class="yt-time">${time}</span> <span class="yt-title">${title}</span>`;
+            timeLabel.innerHTML = `<span class="yt-time"><span class="yt-time-text">${time}</span></span> <span class="yt-title">${title}</span>`;
             attachTitleTooltip(timeLabel.querySelector('.yt-title'));
             
             const expandBtn = document.createElement('span');
@@ -961,6 +1128,8 @@ function renderTimestampsUI(summaryText) {
                 if (wasExpanded) {
                     accordionContent.classList.remove('expanded');
                     expandBtn.textContent = '+';
+                    expandBtn.classList.remove('yt-open');
+                    tsDiv.classList.remove('yt-row-open');
                     _expandedAccordion = null;
                     _expandedAccordionBtn = null;
                     return;
@@ -988,12 +1157,17 @@ function renderTimestampsUI(summaryText) {
 
                     if (_expandedAccordionBtn) {
                         _expandedAccordionBtn.textContent = '+';
+                        _expandedAccordionBtn.classList.remove('yt-open');
+                        const oldRow = _expandedAccordionBtn.closest('.yt-timestamp-item');
+                        if (oldRow) oldRow.classList.remove('yt-row-open');
                     }
                 }
 
                 // Case 3 (falls through from 2, or nothing was open): open this item.
                 accordionContent.classList.add('expanded');
                 expandBtn.textContent = '−';
+                expandBtn.classList.add('yt-open');
+                tsDiv.classList.add('yt-row-open');
                 _expandedAccordion = accordionContent;
                 _expandedAccordionBtn = expandBtn;
             };
@@ -1005,6 +1179,12 @@ function renderTimestampsUI(summaryText) {
             tsDiv.onclick = () => {
                 const video = document.querySelector('video');
                 if (video) video.currentTime = sec;
+                // Quiet-skin seek confirmation: restart the row's pulse overlay
+                // (remove + reflow re-triggers the ::before animation). No-op in
+                // Classic, which has no styles for this class.
+                tsDiv.classList.remove('yt-seek-pulse');
+                void tsDiv.offsetWidth;
+                tsDiv.classList.add('yt-seek-pulse');
             };
             
             timestampsList.appendChild(tsDiv);

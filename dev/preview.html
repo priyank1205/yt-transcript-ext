@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html dark>
+<head>
+<meta charset="utf-8">
+<title>Panel dev preview</title>
+<!--
+  Dev harness for the in-page panel: stubs the chrome.* APIs and loads the real
+  ui-builder.js + both skins' CSS, so panel design work can be previewed and
+  interacted with in a plain browser tab (no extension reload loop).
+  Serve the repo root (e.g. the "options-page" launch config) and open
+  /dev/preview.html. Not shipped: dev/ is not referenced by the manifest.
+-->
+<style>
+  body { margin: 0; padding: 24px; background: #0f0f0f; font-family: Roboto, Arial, sans-serif; transition: background 0.2s; }
+  html:not([dark]) body { background: #ffffff; }
+  #toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+  #toolbar button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  #secondary { width: 402px; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button id="t-dark">Dark</button>
+  <button id="t-light">Light</button>
+  <button id="t-classic">Classic</button>
+  <button id="t-quiet">Quiet</button>
+  <button id="t-reset">Reset panel</button>
+</div>
+<div id="secondary"></div>
+
+<script>
+  // --- chrome.* stubs -------------------------------------------------------
+  window.__prefs = { PANEL_SKIN: 'quiet', THEME_PREF: 'system', GEMINI_API_KEY: 'stub-key' };
+
+  const SAMPLE_SUMMARY = [
+    '#Geopolitical Shifts and Global Conflicts',
+    "[02:04] - China's Strategic Preparations: Intelligence sources indicate that China is actively preparing for a major conflict, though it remains unclear whether these preparations target India or the United States.",
+    '[02:29] - India-US Relations: A direct war between the US and India is unlikely, but a persistent trade war is impacting India\'s economy as part of a broader cycle of global tension.',
+    '[03:57] - The Weaponry Economy: Defense manufacturing is described as the engine of the next economic cycle, with several nations re-arming at a pace unseen since the Cold War.',
+    "#India's Future and Leadership",
+    '[06:28] - India as a Spiritual Capital: The speaker argues India\'s soft power will come from its spiritual traditions rather than manufacturing output.',
+    '[07:47] - Rahu in the Tenth House: An astrological reading connects planetary positions to upcoming political transitions.',
+    '[1:03:34] - Long-Horizon Forecast: A closing hour-mark segment stress-tests the h:mm:ss timestamp path with a long-form prediction about the coming decade.'
+  ].join('\n');
+
+  window.chrome = {
+    storage: {
+      local: {
+        get: (_keys, cb) => setTimeout(() => cb({ ...window.__prefs }), 0),
+        set: (obj) => Object.assign(window.__prefs, obj)
+      },
+      onChanged: { addListener() {} }
+    },
+    runtime: {
+      lastError: null,
+      onMessage: { addListener() {} },
+      sendMessage: (msg, cb) => {
+        if (msg && msg.action === 'START_ANALYSIS') {
+          // Simulate the real flow: progress phase, render, then success.
+          setTimeout(() => updateGenerateButton('calling_api'), 600);
+          setTimeout(() => renderTimestampsUI(SAMPLE_SUMMARY), 2200);
+          setTimeout(() => cb && cb({ success: true }), 2300);
+        } else if (cb) {
+          cb({ success: true });
+        }
+      }
+    }
+  };
+</script>
+<link rel="stylesheet" href="../styles/content.css">
+<link rel="stylesheet" href="../styles/skin-quiet.css">
+<script src="../scripts/ui-builder.js"></script>
+<script>
+  // Boot: apply the stubbed skin pref, then inject like content-main would.
+  setPanelSkinPref(window.__prefs.PANEL_SKIN);
+  injectSidebar(document.getElementById('secondary'));
+
+  document.getElementById('t-dark').onclick = () => {
+    document.documentElement.setAttribute('dark', '');
+    setPanelThemePref('dark');
+  };
+  document.getElementById('t-light').onclick = () => {
+    document.documentElement.removeAttribute('dark');
+    setPanelThemePref('light');
+  };
+  document.getElementById('t-classic').onclick = () => {
+    window.__prefs.PANEL_SKIN = 'classic';
+    setPanelSkinPref('classic');
+  };
+  document.getElementById('t-quiet').onclick = () => {
+    window.__prefs.PANEL_SKIN = 'quiet';
+    setPanelSkinPref('quiet');
+  };
+  document.getElementById('t-reset').onclick = () => {
+    clearSummaryCache(getCurrentVideoId());
+    const c = document.querySelector('.yt-timestamps-container');
+    if (c) renderEmptyState(c);
+  };
+</script>
+</body>
+</html>

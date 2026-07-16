@@ -491,6 +491,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // --- Appearance (panel design skin) ---
+  const skinSegmented = document.getElementById('skin-segmented');
+  if (skinSegmented) {
+    const skinOptions = skinSegmented.querySelectorAll('.segmented-option');
+    const setActiveSkin = (pref) => {
+      skinOptions.forEach((o) =>
+        o.setAttribute('aria-checked', o.dataset.skin === pref ? 'true' : 'false')
+      );
+    };
+    chrome.storage.local.get(['PANEL_SKIN'], (res) => setActiveSkin(res.PANEL_SKIN || 'quiet'));
+    skinOptions.forEach((o) => {
+      o.addEventListener('click', () => {
+        const pref = o.dataset.skin;
+        setActiveSkin(pref);
+        chrome.storage.local.set({ PANEL_SKIN: pref });
+        showToast(`Panel design: ${o.textContent}`);
+      });
+    });
+  }
+
   const statSummaries = document.getElementById('stat-summaries');
   const statTimeSaved = document.getElementById('stat-time-saved');
   if (statSummaries && statTimeSaved) {
