@@ -178,7 +178,9 @@ function applyPlayerHeight() {
         return;
     }
 
+    // Cap the accordion height based on the player height so it doesn't run off-screen
     const accordionMaxH = playerH + ACCORDION_OFFSET;
+
     if (_lastAppliedHeight === accordionMaxH) return;
     _lastAppliedHeight = accordionMaxH;
 
@@ -547,10 +549,12 @@ function buildDetailChip() {
 
     // Sync to the stored default (whatever the user last generated with) once
     // storage resolves. This only updates the in-memory selection/display.
-    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
-        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
-        if (stored !== -1) select(stored);
-    });
+    if (chrome?.storage?.local) {
+        chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+            const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
+            if (stored !== -1) select(stored);
+        });
+    }
 
     return wrap;
 }
@@ -717,8 +721,18 @@ function injectSidebar(secondary) {
     applyPanelTheme('system', container);
     applyPanelSkin(_skinPref, container);
 
-    // Insert container into secondary, then build the empty state inside it
-    secondary.insertBefore(container, secondary.firstChild);
+    // Inject into #secondary-inner so we don't push the sticky engagement panels container down
+    // (which triggers YouTube's responsive layout to auto-close them).
+    const secondaryInner = secondary.querySelector('#secondary-inner');
+    const panels = secondary.querySelector('#panels');
+    
+    if (panels) {
+        panels.parentElement.insertBefore(container, panels);
+    } else if (secondaryInner) {
+        secondaryInner.insertBefore(container, secondaryInner.firstChild);
+    } else {
+        secondary.insertBefore(container, secondary.firstChild);
+    }
     renderEmptyState(container);
     ensureYtThemeObserver();
 
