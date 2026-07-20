@@ -166,19 +166,29 @@ async function pollForPanelContent(panelInfo, maxAttempts, interval) {
   return null;
 }
 
-// Close the transcript panel (old or new) after extraction
+// Close the transcript panel cleanly using native UI elements to avoid breaking YouTube's internal state
 function closeTranscriptPanel(targetPanel) {
-  if (targetPanel) {
-    targetPanel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
-    return;
-  }
-  const panels = document.querySelectorAll(PANEL_SELECTOR);
-  for (const panel of panels) {
+  const panelsToClose = targetPanel ? [targetPanel] : Array.from(document.querySelectorAll(PANEL_SELECTOR));
+
+  for (const panel of panelsToClose) {
     if (panel.getAttribute('visibility') === 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED') {
       const hasSegments = panel.querySelector(SELECTORS.OLD.segment) ||
                           panel.querySelector(SELECTORS.NEW.segment);
-      if (hasSegments) {
-        panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
+      if (hasSegments || targetPanel) {
+        // Try finding the native close button inside the panel header
+        const closeBtn = panel.querySelector('#visibility-button button, #close-button button, button[aria-label="Close transcript"], button[aria-label="Close"]');
+        if (closeBtn) {
+          closeBtn.click();
+        } else {
+          // Fallback: try clicking the transcript toggle button again
+          const transcriptBtn = findTranscriptButton();
+          if (transcriptBtn) {
+            transcriptBtn.click();
+          } else {
+            // Absolute fallback: manipulate DOM attribute (may break state)
+            panel.setAttribute('visibility', 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN');
+          }
+        }
       }
     }
   }
