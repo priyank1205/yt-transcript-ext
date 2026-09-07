@@ -71,6 +71,26 @@ function panelHasSegments(panel) {
 
 // Function to extract transcript from YouTube video
 async function extractTranscript() {
+  const videoId = new URLSearchParams(window.location.search).get('v');
+  const result = await extractPanelTranscript();
+  // Keep successful panel extraction exactly as before. Only missing or
+  // unreadable transcripts need the player's caption track.
+  if (result.success) return result;
+  if (new URLSearchParams(window.location.search).get('v') !== videoId) {
+    return { success: false, error: 'Video changed. Please generate the summary again.' };
+  }
+  try {
+    const captions = await chrome.runtime.sendMessage({ action: 'GET_PLAYER_CAPTIONS', videoId });
+    if (new URLSearchParams(window.location.search).get('v') !== videoId) {
+      return { success: false, error: 'Video changed. Please generate the summary again.' };
+    }
+    return captions || result;
+  } catch (err) {
+    return { success: false, error: 'Could not read captions. Please refresh the page and try again.' };
+  }
+}
+
+async function extractPanelTranscript() {
   try {
     // 1. Check if a transcript is already open and populated
     const alreadyOpen = findRenderedSegments();

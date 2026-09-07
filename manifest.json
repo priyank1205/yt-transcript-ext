@@ -36,6 +36,12 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*"],
+      "js": ["scripts/caption-capture.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
       "js": ["scripts/transcript-engine.js", "scripts/ui-builder.js", "scripts/dom-observer.js", "scripts/content-main.js"],
       "css": ["styles/content.css", "styles/skin-quiet.css"]
     }

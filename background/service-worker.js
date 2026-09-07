@@ -2,6 +2,7 @@
 
 import { PROVIDERS } from '../scripts/providers.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
+import { getPlayerCaptions } from '../scripts/caption-reader.js';
 
 // First-run onboarding: on fresh install, open the settings page and flag the
 // in-page tooltip that points new users to the settings gear icon.
@@ -67,6 +68,12 @@ function getClient(modelName, allProviders) {
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'GET_PLAYER_CAPTIONS') {
+    getPlayerCaptions(request, sender).then(sendResponse).catch(() => {
+      sendResponse({ success: false, error: 'Could not read player captions. Please refresh and try again.' });
+    });
+    return true;
+  }
   if (request.action === "OPEN_OPTIONS") {
     const optionsUrl = chrome.runtime.getURL('options/options.html');
     chrome.tabs.create({ url: optionsUrl });

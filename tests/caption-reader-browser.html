@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Caption parser browser checks</title>
+<h1>Caption parser browser checks</h1>
+<pre id="results">Running…</pre>
+<div id="movie_player"></div>
+<script type="module">
+import { readPlayerCaptions } from '../scripts/caption-reader.js';
+
+// Run the serialized function as Chrome does, using the browser's real XML
+// parser. All caption responses are local fixtures; no YouTube/LLM requests.
+const injectedReader = new Function(`return (${readPlayerCaptions.toString()})`)();
+const originalURL = location.href;
+const originalFetch = window.fetch;
+const player = document.getElementById('movie_player');
+const results = [];
+const cases = [
+  ['JSON3 words and hour timestamp', '{"events":[{"tStartMs":3601500,"segs":[{"utf8":"Hello "},{"utf8":"world"}]}]}', '[1:00:01] Hello world\n'],
+  ['Legacy XML timestamps and entities', '<transcript><text start="1.5" dur="2">Tom &amp; Jerry &#39;hello&#39;</text><text start="65">Next</text></transcript>', "[0:01] Tom & Jerry 'hello'\n[1:05] Next\n"],
+  ['SRV3 words, line breaks, blank cues and invalid times', '<timedtext><body><p t="1234"><s>Hello </s><s>world</s><br/>again</p><p t="2000"> </p><p t="invalid">Skip</p><p t="">Skip</p></body></timedtext>', '[0:01] Hello world again\n'],
+  ['Malformed XML is rejected', '<transcript><text start="1">broken', null],
+  ['HTML error pages are rejected', '<html><body><p t="100">Please sign in</p></body></html>', null],
+  ['Empty caption response is rejected', '', null],
+  ['Empty XML transcript is rejected', '<transcript/>', null]
+];
+try {
+  history.replaceState(null, '', '/watch?v=fixture');
+  player.getPlayerResponse = () => ({
+    videoDetails: { videoId: 'fixture' },
+    captions: { playerCaptionsTracklistRenderer: { captionTracks: [{
+      baseUrl: `${location.origin}/api/timedtext?v=fixture&lang=en`, languageCode: 'en', kind: 'asr'
+    }] } }
+  });
+  for (const [name, body, expected] of cases) {
+    window.fetch = async () => new Response(body, { status: 200 });
+    const result = await injectedReader('fixture');
+    const passed = expected === null ? result.success === false : result.success && result.data === expected;
+    results.push(`${passed ? 'PASS' : 'FAIL'}: ${name}${passed ? '' : '\n' + JSON.stringify(result)}`);
+  }
+  // Exercise the real browser networking APIs, not mocked caption responses.
+  // Use tests/serve-browser-tests.cjs: the fixture endpoint refuses replays.
+  window.fetch = originalFetch;
+  await import('../scripts/caption-capture.js');
+  const capture = window[Symbol.for('yt-transcript-ext.caption-capture')];
+  const run = Date.now();
+  for (const type of ['fetch', 'text', 'json', 'document', 'arraybuffer', 'blob']) {
+    window.dispatchEvent(new Event('yt-navigate-start'));
+    const url = `${location.origin}/api/timedtext?v=fixture&lang=en&run=${run}&type=${type}${type === 'document' ? '&format=xml' : ''}`;
+    let playerBody;
+    if (type === 'fetch') {
+      const response = await window.fetch(new Request(url));
+      playerBody = await response.text();
+    } else {
+      playerBody = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.responseType = type;
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = reject;
+        xhr.send();
+      });
+    }
+    for (let attempt = 0; attempt < 50 && !capture.read('fixture').length; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    const replay = await originalFetch(url);
+    const replayEmpty = (await replay.text()) === '';
+    const transcript = await injectedReader('fixture');
+    const expected = type === 'document' ? '[0:02] Original XML captions\n' : '[0:01] Original player captions\n';
+    const passed = Boolean(playerBody) && replayEmpty && transcript.data === expected;
+    results.push(`${passed ? 'PASS' : 'FAIL'}: ${type} player response survives blocked replay${passed ? '' : '\n' + JSON.stringify(transcript)}`);
+  }
+} catch (error) {
+  results.push(`FAIL: ${error.message}`);
+} finally {
+  window.fetch = originalFetch;
+  delete player.getPlayerResponse;
+  history.replaceState(null, '', originalURL);
+  document.getElementById('results').textContent = results.join('\n');
+}
+</script>
+</html>

@@ -7,13 +7,13 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 
 **Features:**
 
-- Extracts the full timestamped transcript from any YouTube video
+- Extracts timestamped text from YouTube's transcript panel, with a player-caption fallback when the transcript is missing or unreadable
 - Generates a structured, sectioned summary using an LLM (supports multiple providers like Gemini, Mistral, etc.)
 - Every summary point is linked to its exact video timestamp — click to seek
 - Expand a summary point to see in detail
 - Collapse/expand the complete panel
 - Model selector with Auto mode (falls back across available configured providers)
-- Works on any YouTube video with captions enabled
+- Supports readable manual and auto-generated caption tracks, including members-only videos your signed-in account can play
 
 **How it works:**
 
@@ -22,6 +22,10 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 3. Click **Generate summary**
 4. The extension extracts the transcript, sends it to the LLM, and renders a timestamped, sectioned summary
 5. Click any `[timestamp]` line to jump to that moment in the video
+
+The existing transcript-panel flow is tried first. If it fails, the extension reads the player's caption track in the same signed-in YouTube page and passes the same timestamped text format to the summarizer. A small script starts with the page and retains copies of caption responses loaded through fetch or XMLHttpRequest, so the fallback can use the text the player already received even when a second request is rejected. These copies stay in page memory, are limited to four tracks, and are cleared on navigation; request tokens and headers are not retained. The fallback does not change the summary panel, playback position, or CC settings, and needs no additional permissions.
+
+After updating the extension, reload it on Chrome's Extensions page **and refresh the YouTube tab** so caption capture starts before the player loads captions. Keep **CC** enabled, let some captions appear, and click **Generate summary**. Members-only videos require your account to have access; caption availability alone does not guarantee a readable track. Active live streams are not supported by the caption fallback.
 
 **Setup:**
 
@@ -33,3 +37,9 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 Get a Gemini API key: https://aistudio.google.com/apikey
 
 Get a Mistral API key: https://console.mistral.ai/api-keys/
+
+**Development checks:**
+
+- Run `node --test tests/*.test.cjs` for transcript regression, caption capture/fallback, request routing, and navigation checks.
+- Run `node tests/serve-browser-tests.cjs` and open `http://127.0.0.1:8765/tests/caption-reader-browser.html` for JSON3/XML parsing and real fetch/XHR response-capture checks. The local caption endpoint succeeds once and refuses replays. These checks use fixture captions and make no YouTube or LLM requests.
+- After updating the unpacked extension, reload it on Chrome's Extensions page and refresh the YouTube tab. Verify a normal video and a captions-only video in an account with access, including clicking a summary timestamp.
