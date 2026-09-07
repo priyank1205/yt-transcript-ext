@@ -1,3 +1,4 @@
 # Local development files that should not be committed
 ROADMAP.md
 audit/
+.DS_Store
