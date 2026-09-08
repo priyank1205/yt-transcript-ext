@@ -71,11 +71,17 @@ usually the failure it prevents — rather than restating what the line does.
 
 ## Releases
 
+Releases are published automatically. Pushing to `main` with a version that
+has no release yet publishes it with the zip attached; pushing to `main`
+without changing the version does nothing.
+
 1. Bump `version` in `manifest.json` and `package.json` (the check requires
    they agree).
-2. `npm run check`
-3. `npm run package` → `dist/timestamped-summary-for-youtube-v<version>.zip`
-4. Tag the commit and attach the zip to a GitHub release.
+2. Push to `main`.
+
+The workflow re-runs the checks, builds the zip, tags the commit `v<version>`
+and publishes the release. To build the same zip locally without releasing
+anything, run `npm run package`.
 
 ## Filing issues
 

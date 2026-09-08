@@ -1,0 +1,67 @@
+name: Release
+
+# Publishes a GitHub release whenever the version in manifest.json is one that
+# has not been released yet. So the trigger is a version bump, not every push:
+# pushing a typo fix to main does nothing, while pushing a bumped version
+# publishes that version with its zip attached.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Publish if the version is new
+    runs-on: ubuntu-latest
+    permissions:
+      # The default token is read-only; creating a tag and a release needs this.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Publish release if the manifest version has none
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          VERSION="$(node -p "require('./manifest.json').version")"
+          TAG="v$VERSION"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already released — nothing to publish."
+            exit 0
+          fi
+
+          # Never publish a package that fails its own checks.
+          npm run check
+          npm run package
+
+          cat > /tmp/notes.md <<'NOTES'
+          ### Install
+
+          1. Download the `.zip` below and unzip it.
+          2. Open `chrome://extensions` and turn on **Developer mode**.
+          3. Click **Load unpacked** and choose the unzipped folder.
+          4. Open a YouTube video — the **Timestamped Summary** panel appears in the sidebar.
+
+          Then open the extension's settings and paste an API key for one provider
+          (Gemini, OpenAI, Anthropic, Mistral, or your own endpoint).
+
+          ### Updating from an earlier version
+
+          Unzip over the same folder, click the reload arrow on the extension's card
+          in `chrome://extensions`, then **refresh any open YouTube tab** — caption
+          capture starts with the page, so an already-open tab is still running the
+          previous version.
+          NOTES
+
+          gh release create "$TAG" dist/*.zip \
+            --title "$TAG" \
+            --notes-file /tmp/notes.md
+
+          echo "Published $TAG"

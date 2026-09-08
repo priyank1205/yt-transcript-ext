@@ -68,13 +68,15 @@ After updating the extension, reload it on Chrome's Extensions page **and refres
 Chrome, Edge, Brave or any other Chromium browser. Not published to the Chrome
 Web Store — install it unpacked:
 
-1. Get the files — clone the repo, or use the green **Code** button on GitHub
-   to download a ZIP and unzip it.
+1. Download the zip from the
+   [latest release](https://github.com/priyank1205/yt-transcript-ext/releases/latest)
+   and unzip it. (Or clone the repo — the extension runs from the source folder
+   as-is.)
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** and choose the folder.
 4. Open a YouTube video — the **Timestamped Summary** panel appears in the sidebar.
 
-**Updating:** pull, or download the new version over the same folder. Then click
+**Updating:** unzip the newer release over the same folder, or pull. Then click
 the reload arrow on the extension's card in `chrome://extensions` and **refresh
 any open YouTube tab** — caption capture starts with the page, so a tab that was
 already open is still running the previous version.
