@@ -2,6 +2,7 @@
 
 import { LLMClient } from './llm-client.js';
 import CONSTANTS, { composeSummaryPrompt } from './constants.js';
+import { apiError, codeForStatus, ERROR_CODES } from './errors.js';
 
 class AnthropicClient extends LLMClient {
   constructor(providerConfig) {
@@ -49,13 +50,13 @@ Here is the transcript: ${transcript}`;
       else if (status === 429) errorMsg = 'Rate limit exceeded. Please try again later.';
       else if (status >= 500) errorMsg = `${this.getModelName()} service unavailable. Please try again later.`;
       else errorMsg = result.error?.message || `${this.getModelName()} API error: ${status}`;
-      throw new Error(errorMsg);
+      throw apiError(codeForStatus(status), errorMsg, status);
     }
     
     if (result.content && result.content.length > 0 && result.content[0].text) {
       return result.content[0].text;
     } else {
-      throw new Error(`Failed to get response from ${this.getModelName()}.`);
+      throw apiError(ERROR_CODES.BAD_OUTPUT, `Failed to get response from ${this.getModelName()}.`, response.status);
     }
   }
 

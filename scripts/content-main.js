@@ -75,7 +75,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     } else if (request.action === "PROGRESS_UPDATE") {
         if (typeof updateGenerateButton === 'function') {
-            updateGenerateButton(request.phase, request.message, request.keepOpen);
+            // 'error' carries the classified payload from scripts/errors.js;
+            // the other phases carry nothing the panel needs.
+            updateGenerateButton(request.phase, request.error);
         }
         sendResponse({ success: true });
         return true;

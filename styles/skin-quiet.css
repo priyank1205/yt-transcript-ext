@@ -257,15 +257,57 @@
   border: none;
 }
 
-/* Error state: neutral fill drains away, message reads in accent text */
-.yt-timestamps-container.yt-skin-quiet .yt-error-state {
-  background: transparent !important;
-  color: var(--q-accent-text) !important;
-  box-shadow: inset 0 0 0 1px var(--q-focus);
+/* Error block: surface over stroke, one accent, actions as quiet tonal chips */
+.yt-timestamps-container.yt-skin-quiet .yt-error-block {
+  background: var(--q-raised);
+  border: none;
+  box-shadow: inset 0 0 0 1px var(--q-border);
+  border-radius: 10px;
+  padding: 12px 14px;
 }
 
-.yt-timestamps-container.yt-skin-quiet .yt-error-state:hover {
-  background: transparent !important;
+.yt-timestamps-container.yt-skin-quiet .yt-error-head {
+  color: var(--q-accent-text);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-title {
+  font-weight: 500;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-detail {
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn {
+  background: var(--q-chip);
+  border: none;
+  color: var(--q-text-1);
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn:hover {
+  background: var(--q-chip-hover);
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn:active {
+  transform: scale(0.985);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn.yt-error-primary {
+  background: var(--q-accent-tint);
+  color: var(--q-accent-text);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn.yt-error-primary:hover {
+  background: var(--q-accent-pulse);
+  color: var(--q-accent-text);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-error-btn:focus-visible {
+  outline: 2px solid var(--q-focus);
+  outline-offset: 2px;
 }
 
 /* Spinner sits on the tonal fill */

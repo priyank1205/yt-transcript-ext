@@ -9,6 +9,18 @@ const SPINNER = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:cur
 const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
 const TRASH_ICON = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 
+// Escape a dynamic string for interpolation into an HTML template. Provider
+// names, descriptions and model ids are user- or provider-supplied text, so
+// they must never be able to close a tag or an attribute.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Banner icon paths
 const INFO_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z';
 const CHECK_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
@@ -76,6 +88,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     customProvidersList.forEach(cp => {
       ALL_PROVIDERS[cp.id] = {
         ...cp,
+        // The card/list templates inject svgIcon and helpSteps as raw HTML, so
+        // those fields are only ever taken from the built-in registry — a stored
+        // custom provider falls back to the generic icon and no help section.
+        svgIcon: undefined,
+        helpTitle: undefined,
+        helpSteps: undefined,
         clientClass: OpenAICompatibleClient
       };
     });
@@ -102,13 +120,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindDeleteCustomBtns();
   }
 
-  function getProviderFormHTML(p, inModal = false) {
+  function getProviderFormHTML(p, inModal = false, savedModel = null) {
+    const id = escapeHtml(p.id);
+    const name = escapeHtml(p.name);
+    const defaultModel = escapeHtml(savedModel || p.defaultModel);
+    const defaultModelLabel = escapeHtml(savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel));
     return `
       <div class="input-group">
-        <label for="${p.id}-api-key">API Key</label>
+        <label for="${id}-api-key">API Key</label>
         <div class="input-wrapper">
-          <input type="password" id="${p.id}-api-key" placeholder="Paste your ${p.name} API key" autocomplete="off" spellcheck="false">
-          <button class="toggle-visibility" data-target="${p.id}-api-key" title="Toggle visibility">
+          <input type="password" id="${id}-api-key" placeholder="Paste your ${name} API key" autocomplete="off" spellcheck="false">
+          <button class="toggle-visibility" data-target="${id}-api-key" title="Toggle visibility">
             <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
             <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
           </button>
@@ -116,32 +138,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       
       <div class="input-group">
-        <label for="${p.id}-model">Model</label>
+        <label for="${id}-model">Model</label>
         <div class="input-wrapper">
-          <select id="${p.id}-model" disabled>
-            <option value="${p.defaultModel}">${p.defaultModel}</option>
+          <select id="${id}-model" disabled>
+            <option value="${defaultModel}">${defaultModelLabel}</option>
           </select>
         </div>
       </div>
 
-      <div class="key-hint" id="${p.id}-key-hint" hidden></div>
+      <div class="key-hint" id="${id}-key-hint" hidden></div>
       <div class="action-row" ${inModal ? 'style="margin-top: 16px;"' : ''}>
-        <button class="save-btn" id="save-${p.id}-key">
+        <button class="save-btn" id="save-${id}-key">
           <span class="btn-content">${SAVE_ICON} Save</span>
         </button>
-        ${!inModal ? `<button class="remove-btn" id="remove-${p.id}-key" hidden>Remove</button>` : ''}
+        ${!inModal ? `<button class="remove-btn" id="remove-${id}-key" hidden>Remove</button>` : ''}
       </div>
       
       ${(!p.isCustom && !inModal) ? `
       <div class="help">
-        <button class="help-toggle" id="${p.id}-help-toggle" aria-expanded="false" aria-controls="${p.id}-help">
+        <button class="help-toggle" id="${id}-help-toggle" aria-expanded="false" aria-controls="${id}-help">
           <span class="help-toggle-label">
             <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
             ${p.helpTitle}
           </span>
           <svg class="help-chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
         </button>
-        <div class="help-body" id="${p.id}-help">
+        <div class="help-body" id="${id}-help">
           <div class="help-body-inner">
             <ol class="help-steps">
               ${p.helpSteps.map(step => `<li>${step}</li>`).join('')}
@@ -155,20 +177,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderConfiguredCard(p, res) {
     const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
 
+    const id = escapeHtml(p.id);
     const cardHTML = `
-      <div class="model-card" id="card-${p.id}">
+      <div class="model-card" id="card-${id}">
         <div class="card-header">
-          <div class="model-icon ${p.cssClass || 'openai'}">
+          <div class="model-icon ${escapeHtml(p.cssClass || 'openai')}">
             ${svgIcon}
           </div>
           <div class="model-info">
-            <div class="model-name">${p.name}</div>
-            <div class="model-desc">${p.description}</div>
+            <div class="model-name">${escapeHtml(p.name)}</div>
+            <div class="model-desc">${escapeHtml(p.description)}</div>
           </div>
-          <span class="status-badge not-configured" id="${p.id}-status">Not set</span>
-          ${p.isCustom ? `<button class="delete-custom-btn" data-id="${p.id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
+          <span class="status-badge not-configured" id="${id}-status">Not set</span>
+          ${p.isCustom ? `<button class="delete-custom-btn" data-id="${id}" title="Delete Provider">${TRASH_ICON}</button>` : ''}
         </div>
-        ${getProviderFormHTML(p, false)}
+        ${getProviderFormHTML(p, false, res ? res[`${p.id}_MODEL`] : null)}
       </div>
     `;
     
@@ -182,8 +205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const item = document.createElement('div');
     item.className = 'command-item';
     item.innerHTML = `
-      <div class="command-item-icon ${p.cssClass || 'openai'}">${svgIcon}</div>
-      <div class="command-item-name">${p.name}</div>
+      <div class="command-item-icon ${escapeHtml(p.cssClass || 'openai')}">${svgIcon}</div>
+      <div class="command-item-name">${escapeHtml(p.name)}</div>
     `;
     
     item.addEventListener('click', () => {
@@ -295,7 +318,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Render cached models immediately
       if (cachedModels.length === 0) {
-        p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
+        const initialVal = savedModel || p.defaultModel;
+        const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
+        setSingleOption(p.modelSelect, initialVal, initialLabel);
       } else {
         renderSelectOptions(p, cachedModels, savedModel);
       }
@@ -304,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (apiKey || p.isCustom) {
         // Show loading state ONLY if we had no cache
         if (cachedModels.length === 0) {
-          p.modelSelect.innerHTML = `<option value="">Loading models...</option>`;
+          setSingleOption(p.modelSelect, '', 'Loading models...');
         }
         
         try {
@@ -316,9 +341,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
           console.error(`Failed to fetch fresh models for ${p.id}`, e);
           // If fetch fails but we had cache, we just keep the cache.
-          // If we had no cache and fetch fails, fall back to default:
+          // If we had no cache and fetch fails, fall back to default/savedModel:
           if (cachedModels.length === 0) {
-             p.modelSelect.innerHTML = `<option value="${p.defaultModel}">${p.defaultModel}</option>`;
+             const initialVal = savedModel || p.defaultModel;
+             const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
+             setSingleOption(p.modelSelect, initialVal, initialLabel);
              p.modelSelect.disabled = false;
           }
         }
@@ -328,8 +355,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Replace a <select>'s contents with one placeholder option. Model ids are
+  // provider-supplied strings, so the option is built rather than interpolated.
+  function setSingleOption(select, value, label) {
+    select.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+
   function renderSelectOptions(p, modelsList, savedModel) {
-    p.modelSelect.innerHTML = '';
+    p.modelSelect.textContent = '';
     modelsList.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.id;
@@ -337,12 +374,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       p.modelSelect.appendChild(opt);
     });
     
-    if (savedModel && modelsList.find(m => m.id === savedModel)) {
-      p.modelSelect.value = savedModel;
-    } else if (modelsList.find(m => m.id === p.defaultModel)) {
-      p.modelSelect.value = p.defaultModel;
-    } else if (modelsList.length > 0) {
-      p.modelSelect.value = modelsList[0].id;
+    let targetModel = null;
+    if (savedModel && modelsList.some(m => m.id === savedModel)) {
+      targetModel = modelsList.find(m => m.id === savedModel);
+    } else {
+      if (p.id === 'gemini') {
+        targetModel = modelsList.find(m => m.name === 'Gemini Flash-Lite Latest')
+          || modelsList.find(m => m.id === 'gemini-flash-lite-latest')
+          || modelsList.find(m => m.id === p.defaultModel)
+          || (p.defaultModelName && modelsList.find(m => m.name === p.defaultModelName))
+          || modelsList.find(m => m.name?.toLowerCase().includes('flash-lite latest'))
+          || modelsList.find(m => m.id?.toLowerCase().includes('flash-lite-latest'))
+          || modelsList.find(m => m.name?.toLowerCase().includes('flash-lite'))
+          || modelsList.find(m => m.id?.toLowerCase().includes('flash-lite'));
+      } else {
+        targetModel = modelsList.find(m => m.id === p.defaultModel)
+          || (p.defaultModelName && modelsList.find(m => m.name === p.defaultModelName));
+      }
+
+      if (!targetModel && modelsList.length > 0) {
+        targetModel = modelsList[0];
+      }
+    }
+
+    if (targetModel) {
+      p.modelSelect.value = targetModel.id;
+      if (!savedModel) {
+        chrome.storage.local.set({ [`${p.id}_MODEL`]: targetModel.id });
+      }
     }
     p.modelSelect.disabled = false;
   }
@@ -438,8 +497,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.dataset.model = p.id;
         const svgIcon = p.svgIcon || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
         item.innerHTML = `
-          <div class="command-item-icon ${p.cssClass || 'openai'}">${svgIcon}</div>
-          <div class="command-item-name">${p.name}</div>
+          <div class="command-item-icon ${escapeHtml(p.cssClass || 'openai')}">${svgIcon}</div>
+          <div class="command-item-name">${escapeHtml(p.name)}</div>
         `;
         item.addEventListener('click', () => selectModel(p.id));
         selectorList.appendChild(item);
@@ -576,7 +635,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     p.saveBtn.classList.add('saving');
     setBtn(p.saveBtn, SPINNER, 'Saving...');
-    chrome.storage.local.set({ [p.storageKey]: key }, () => {
+
+    const updates = { [p.storageKey]: key };
+    const stored = await new Promise(resolve => chrome.storage.local.get([`${p.id}_MODEL`], resolve));
+    if (!stored[`${p.id}_MODEL`]) {
+      const defaultVal = (p.id === 'gemini') ? 'gemini-flash-lite-latest' : (p.modelSelect?.value || p.defaultModel);
+      if (defaultVal) {
+        updates[`${p.id}_MODEL`] = defaultVal;
+      }
+    }
+
+    chrome.storage.local.set(updates, () => {
       setTimeout(() => {
         p.saveBtn.classList.remove('saving');
         setBtn(p.saveBtn, CHECK_ICON, 'Saved');

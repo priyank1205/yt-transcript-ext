@@ -3,6 +3,7 @@
 import { PROVIDERS } from '../scripts/providers.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 import { getPlayerCaptions } from '../scripts/caption-reader.js';
+import { classifyError, ERROR_CODES } from '../scripts/errors.js';
 
 // First-run onboarding: on fresh install, open the settings page and flag the
 // in-page tooltip that points new users to the settings gear icon.
@@ -20,6 +21,19 @@ async function sendTabMessage(tabId, message) {
   } catch (err) {
     // Silently ignore errors (e.g., content script not ready or tab closed)
   }
+}
+
+// Every analysis failure leaves through here. It categorises the error once and
+// gives the panel what it needs to recover: a persistent explanation, the flag
+// that decides whether "Open settings" is offered, and a sanitized message for
+// the copyable diagnostics. The panel decides presentation; nothing downstream
+// has to sniff error strings.
+async function failAnalysis(tabId, sendResponse, input, context = {}) {
+  const error = classifyError(input, context);
+  console.warn(`Analysis failed [${error.code}] at ${error.stage || 'unknown'} stage:`, error.raw);
+  if (tabId) await sendTabMessage(tabId, { action: "PROGRESS_UPDATE", phase: "error", error });
+  sendResponse({ success: false, error });
+  return error;
 }
 
 // Removed getOtherModel, as fallback is now dynamic
@@ -90,7 +104,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "START_ANALYSIS") {
     handleAnalysis(sendResponse, request.model, request.length).catch(err => {
       console.warn('Unhandled error in handleAnalysis:', err);
-      sendResponse({ success: false, error: err.message || 'Unknown error occurred' });
+      sendResponse({ success: false, error: classifyError(err, { stage: 'generation' }) });
     });
     return true;
   }
@@ -99,15 +113,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
   const originalModel = modelName;
   console.log(`handleAnalysis called with model: ${originalModel}`);
-  
+
+  // Declared out here so the catch below can still report which provider and
+  // model the request was using when it failed.
+  let resolvedModel = modelName;
+  let summaryOptions = null;
+
   try {
     // 1. Get the active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     console.log(`Active tab ID: ${tab?.id}`);
     
     if (!tab || !tab.id) {
-      console.warn('No active tab found');
-      sendResponse({ success: false, error: 'No active tab found', keepOpen: true });
+      await failAnalysis(null, sendResponse, 'No active tab found', { stage: 'setup' });
       return;
     }
     
@@ -131,10 +149,9 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
 
     // Resolve the summary "Detail" preset: explicit request wins, then the
     // persisted preference, then the standard default. Passed to every callAPI.
-    const summaryOptions = { length: length || storage.SUMMARY_LENGTH || 'standard' };
-    
+    summaryOptions = { length: length || storage.SUMMARY_LENGTH || 'standard' };
+
     // 2. Resolve 'auto' to actual model
-    let resolvedModel = modelName;
     if (modelName === 'auto') {
       const availableProviders = Object.keys(allProviders).filter(id => storage[allProviders[id].storageKey] || (allProviders[id].isCustom && storage[allProviders[id].storageKey] === ''));
       if (availableProviders.length > 0) {
@@ -157,15 +174,9 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
     console.log('Transcript fetched successfully:', transcriptResponse?.success);
     
     if (!transcriptResponse || !transcriptResponse.success) {
-      const errorMsg = transcriptResponse ? transcriptResponse.error : "Could not connect to page.";
-      const keepOpen = errorMsg.includes('no captions');
-      if (keepOpen) {
-        console.warn('Transcript:', errorMsg);
-      } else {
-        console.warn('Failed to fetch transcript:', errorMsg);
-      }
-      await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg, keepOpen });
-      sendResponse({ success: false, error: errorMsg, keepOpen });
+      await failAnalysis(tab.id, sendResponse,
+        transcriptResponse || { message: "Could not connect to page.", code: ERROR_CODES.CAPTIONS_UNREADABLE },
+        { stage: 'transcript', detail: summaryOptions.length });
       return;
     }
 
@@ -188,16 +199,15 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
           resolvedModel = fallbackModel;
           llmClient = getClient(resolvedModel, allProviders);
         } else {
-          const errorMsg = `No API key found. Please set one in settings.`;
-          await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
-          sendResponse({ success: false, error: errorMsg });
+          await failAnalysis(tab.id, sendResponse,
+            { message: 'No API key found. Please set one in settings.', code: ERROR_CODES.NO_KEY },
+            { stage: 'setup', detail: summaryOptions.length });
           return;
         }
       } else {
-        const errorMsg = `API Key not found for ${allProviders[resolvedModel].name}. Please set it in settings.`;
-        console.warn(errorMsg);
-        await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: errorMsg });
-        sendResponse({ success: false, error: errorMsg });
+        await failAnalysis(tab.id, sendResponse,
+          { message: `API key not found for provider ${resolvedModel}.`, code: ERROR_CODES.NO_KEY },
+          { stage: 'setup', provider: resolvedModel, detail: summaryOptions.length });
         return;
       }
     }
@@ -224,7 +234,10 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
         
         if (!fallbackModel) {
           console.warn(`No API key for any fallback model`);
-          sendResponse({ success: false, error: apiErr.message });
+          await failAnalysis(tab.id, sendResponse, apiErr, {
+            stage: 'generation', provider: resolvedModel,
+            model: summaryOptions.modelId, detail: summaryOptions.length
+          });
           return;
         }
 
@@ -256,9 +269,9 @@ async function handleAnalysis(sendResponse, modelName = 'gemini', length) {
   } catch (err) {
     console.warn('Error in handleAnalysis:', err.message, err.stack);
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [null]);
-    if (tab) {
-      await sendTabMessage(tab.id, { action: "PROGRESS_UPDATE", phase: "error", message: err.message });
-    }
-    sendResponse({ success: false, error: err.message });
+    await failAnalysis(tab?.id || null, sendResponse, err, {
+      stage: 'generation', provider: resolvedModel,
+      model: summaryOptions?.modelId, detail: summaryOptions?.length
+    });
   }
 }

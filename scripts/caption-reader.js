@@ -3,11 +3,14 @@
 // Only reads the current player's metadata and fetches its caption resources;
 // never toggles CC, seeks playback, or calls a separate player API.
 export async function readPlayerCaptions(videoId) {
-  const failure = error => ({ success: false, error });
+  // Codes are the string values of ERROR_CODES in scripts/errors.js. This
+  // function is injected into the MAIN world, so it cannot reference imports:
+  // the codes travel as literals and the service worker categorises them.
+  const failure = (error, code = 'captions_unreadable') => ({ success: false, error, code });
   const changed = () => location.pathname !== '/watch' ||
     new URLSearchParams(location.search).get('v') !== videoId;
   const changedError = 'Video changed. Please generate the summary again.';
-  if (!videoId || changed()) return failure(changedError);
+  if (!videoId || changed()) return failure(changedError, 'video_changed');
 
   let navigated = false;
   const onNavigate = () => { navigated = true; };
@@ -93,7 +96,7 @@ export async function readPlayerCaptions(videoId) {
     }
     const orderedTracks = [...tracks].sort((a, b) => rank(a) - rank(b));
     if (response?.videoDetails?.isLive === true) {
-      return failure('Full captions are not available during a live stream. Try after it ends.');
+      return failure('Full captions are not available during a live stream. Try after it ends.', 'no_captions');
     }
     const preferredLanguage = selected?.languageCode || orderedTracks[0]?.languageCode;
     // Prefer the actual response YouTube loaded. Resource timing only exposes
@@ -114,7 +117,7 @@ export async function readPlayerCaptions(videoId) {
       } catch { /* Capture is optional; older tabs can still try URL fallback. */ }
       return null;
     }
-    if (stale()) return failure(changedError);
+    if (stale()) return failure(changedError, 'video_changed');
     const captured = readCaptured();
     if (captured) return captured;
     const candidates = [];
@@ -139,13 +142,13 @@ export async function readPlayerCaptions(videoId) {
     for (const url of resources.slice(0, 2)) enqueue(url.href);
     for (const track of orderedTracks) enqueue(track.baseUrl, true);
     if (!candidates.length) {
-      return failure('No transcript found. If CC is available, turn it on and retry.');
+      return failure('No transcript found. If CC is available, turn it on and retry.', 'no_captions');
     }
 
     // Bound fallback time so a failing caption server cannot hold up the panel.
     const deadline = Date.now() + 15000;
     for (const url of candidates.slice(0, 4)) {
-      if (stale()) return failure(changedError);
+      if (stale()) return failure(changedError, 'video_changed');
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
       const controller = new AbortController();
@@ -156,13 +159,13 @@ export async function readPlayerCaptions(videoId) {
         });
         if (!result.ok) continue;
         const body = await result.text();
-        if (stale()) return failure(changedError);
+        if (stale()) return failure(changedError, 'video_changed');
         const data = parseCaptions(body);
         if (data) return { success: true, data };
       } catch { /* Expired signatures, blocked requests, empty/invalid responses: try next track. */ }
       finally { clearTimeout(timer); }
     }
-    if (stale()) return failure(changedError);
+    if (stale()) return failure(changedError, 'video_changed');
     // A player request may have completed while URL fallback was running.
     const recentlyCaptured = readCaptured();
     if (recentlyCaptured) return recentlyCaptured;
@@ -181,12 +184,12 @@ export async function readPlayerCaptions(videoId) {
 // from the message. Only the resulting transcript leaves the page context.
 export async function getPlayerCaptions(request, sender) {
   let page;
-  try { page = new URL(sender.url); } catch { return { success: false, error: 'Invalid video page.' }; }
+  try { page = new URL(sender.url); } catch { return { success: false, error: 'Invalid video page.', code: 'video_changed' }; }
   if (!sender.tab?.id || sender.frameId !== 0 ||
       !['https:', 'http:'].includes(page.protocol) ||
       !(page.hostname === 'youtube.com' || page.hostname.endsWith('.youtube.com')) ||
       page.pathname !== '/watch' || !request.videoId || page.searchParams.get('v') !== request.videoId) {
-    return { success: false, error: 'Invalid video page.' };
+    return { success: false, error: 'Invalid video page.', code: 'video_changed' };
   }
   try {
     const results = await chrome.scripting.executeScript({
@@ -195,8 +198,8 @@ export async function getPlayerCaptions(request, sender) {
       func: readPlayerCaptions,
       args: [request.videoId]
     });
-    return results[0]?.result || { success: false, error: 'Could not read player captions. Please refresh and try again.' };
+    return results[0]?.result || { success: false, error: 'Could not read player captions. Please refresh and try again.', code: 'captions_unreadable' };
   } catch {
-    return { success: false, error: 'Could not read player captions. Please refresh and try again.' };
+    return { success: false, error: 'Could not read player captions. Please refresh and try again.', code: 'captions_unreadable' };
   }
 }

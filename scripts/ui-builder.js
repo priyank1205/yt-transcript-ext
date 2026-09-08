@@ -811,7 +811,7 @@ function runAnalysis() {
             const timer = setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
-                    resolve({ success: false, error: `Request timed out` });
+                    resolve({ success: false, error: LOCAL_ERRORS.timeout });
                 }
             }, timeout);
 
@@ -820,12 +820,12 @@ function runAnalysis() {
                     resolved = true;
                     clearTimeout(timer);
                     if (chrome.runtime.lastError) {
-                        resolve({ success: false, error: chrome.runtime.lastError.message });
+                        resolve({ success: false, error: LOCAL_ERRORS.disconnected });
                     } else {
-                        resolve(res || { success: false, error: 'No response from background' });
+                        resolve(res || { success: false, error: LOCAL_ERRORS.disconnected });
                     }
                 } else {
-                    resolve({ success: false, error: 'No response from background' });
+                    resolve({ success: false, error: LOCAL_ERRORS.disconnected });
                 }
             });
         });
@@ -849,10 +849,10 @@ function runAnalysis() {
             if (result && result.success) {
                 updateGenerateButton('done');
             } else {
-                updateGenerateButton('error', result?.error || 'Unknown error', result?.keepOpen);
+                updateGenerateButton('error', result?.error);
             }
         } catch (e) {
-            updateGenerateButton('error', 'Extension context invalidated');
+            updateGenerateButton('error', LOCAL_ERRORS.disconnected);
         }
     })();
 }
@@ -884,14 +884,213 @@ function setGenerateButtonMode(genBtn) {
 function refreshGenerateButtonMode() {
     const genBtn = document.querySelector('.yt-timestamps-generate-button');
     if (!genBtn) return;
-    if (genBtn.disabled || genBtn.classList.contains('yt-error-state')) return;
+    if (genBtn.disabled || genBtn.hidden) return;
     setGenerateButtonMode(genBtn);
 }
 
+// Set the primary button's label as text, optionally preceded by the spinner.
+// Provider/API error strings reach this button, so its content is built from
+// nodes instead of markup.
+function setGenerateButtonLabel(genBtn, text, withSpinner) {
+    genBtn.textContent = '';
+    if (withSpinner) {
+        const spinner = document.createElement('span');
+        spinner.className = 'yt-spinner';
+        genBtn.appendChild(spinner);
+    }
+    genBtn.appendChild(document.createTextNode(text));
+}
+
+// --- Recoverable errors ------------------------------------------------------
+//
+// A failure used to be pushed into the Generate button's label and cleared
+// after three seconds (or left the button permanently disabled). Instead the
+// panel now shows a compact status block that stays until the user acts, and
+// every category offers a way forward: Retry always, Open settings when the fix
+// lives there, and Copy details for a report that carries no secrets.
+//
+// The categories themselves come from the service worker (scripts/errors.js).
+// The two below are the ones it can never report, because they are failures of
+// the message channel itself.
+const LOCAL_ERRORS = {
+    timeout: {
+        code: 'timeout',
+        title: 'The request timed out',
+        detail: 'No response after two minutes. Try again, or switch to a faster model.',
+        settings: true
+    },
+    disconnected: {
+        code: 'disconnected',
+        title: 'The extension reloaded',
+        detail: 'Refresh this YouTube page, then try again.',
+        settings: false
+    }
+};
+
+const ALERT_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+// Accept either a classified payload from the background or a bare string, so
+// an older message (or the dev harness) still renders something sensible.
+function normalizeError(input) {
+    if (input && typeof input === 'object' && (input.title || input.code)) {
+        return {
+            code: input.code || 'unknown',
+            title: input.title || 'Something went wrong',
+            detail: input.detail || '',
+            settings: !!input.settings,
+            raw: input.raw || '',
+            stage: input.stage || null,
+            provider: input.provider || null,
+            model: input.model || null,
+            level: input.level || null,
+            status: input.status || null
+        };
+    }
+    return {
+        code: 'unknown',
+        title: 'Something went wrong',
+        detail: typeof input === 'string' && input ? input : "The summary couldn't be generated.",
+        settings: false,
+        raw: typeof input === 'string' ? input : ''
+    };
+}
+
+// The error currently on screen, so Copy details can build its report.
+let _lastError = null;
+
+function makeErrorAction(label, extraClass, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = extraClass ? `yt-error-btn ${extraClass}` : 'yt-error-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onClick(btn);
+    });
+    return btn;
+}
+
+// A copyable report for bug threads. Deliberately excludes API keys, caption
+// URLs (they carry signatures and session tokens), transcript text, the video
+// title and the video ID; `raw` was already sanitized by scripts/errors.js.
+function buildDiagnostics(error) {
+    const manifest = (typeof chrome !== 'undefined' && chrome.runtime?.getManifest)
+        ? chrome.runtime.getManifest() : {};
+    const lines = [
+        `${manifest.name || 'YouTube Transcript Extractor'} ${manifest.version || ''}`.trim(),
+        `When: ${new Date().toISOString()}`,
+        `Category: ${error.code || 'unknown'} — ${error.title || ''}`,
+        `Stage: ${error.stage || 'unknown'}`
+    ];
+    if (error.provider) lines.push(`Provider: ${error.provider}`);
+    if (error.model) lines.push(`Model: ${error.model}`);
+    if (error.level) lines.push(`Detail level: ${error.level}`);
+    if (error.status) lines.push(`HTTP status: ${error.status}`);
+    if (error.raw) lines.push(`Message: ${error.raw}`);
+    lines.push('', 'Excludes API keys, caption URLs, transcript text and video details.');
+    return lines.join('\n');
+}
+
+function copyDiagnostics(btn) {
+    const text = buildDiagnostics(_lastError || { code: 'unknown' });
+    const confirm = () => {
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = 'Copy details'; }, 1600);
+    };
+    const fallback = () => {
+        // clipboard.writeText needs a focused document and a secure context;
+        // neither is guaranteed inside YouTube's page, so keep the old path.
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand('copy'); confirm(); }
+        catch { btn.textContent = 'Copy failed'; setTimeout(() => { btn.textContent = 'Copy details'; }, 1600); }
+        area.remove();
+    };
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(confirm).catch(fallback);
+    } else {
+        fallback();
+    }
+}
+
+// Remove the status block and put the Generate button back in charge.
+function clearErrorBlock() {
+    _lastError = null;
+    const block = document.querySelector('.yt-error-block');
+    if (block) block.remove();
+    const genBtn = document.querySelector('.yt-timestamps-generate-button');
+    if (genBtn) genBtn.hidden = false;
+}
+
+function renderErrorBlock(error) {
+    // Normally the action area under the empty state. The fallbacks exist so a
+    // failure is never swallowed if generation is somehow reported while the
+    // panel is showing something else.
+    const host = document.getElementById('action-area')
+        || document.querySelector('.yt-timestamps-panel-body')
+        || document.querySelector('.yt-timestamps-panel');
+    if (!host) return;
+
+    _lastError = error;
+    const existing = document.querySelector('.yt-error-block');
+    if (existing) existing.remove();
+
+    const block = document.createElement('div');
+    block.className = 'yt-error-block';
+    block.setAttribute('role', 'alert');
+
+    const head = document.createElement('div');
+    head.className = 'yt-error-head';
+    const icon = document.createElement('span');
+    icon.className = 'yt-error-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = ALERT_SVG;
+    const title = document.createElement('span');
+    title.className = 'yt-error-title';
+    title.textContent = error.title;
+    head.appendChild(icon);
+    head.appendChild(title);
+
+    const detail = document.createElement('p');
+    detail.className = 'yt-error-detail';
+    detail.textContent = error.detail;
+
+    const actions = document.createElement('div');
+    actions.className = 'yt-error-actions';
+    actions.appendChild(makeErrorAction('Try again', 'yt-error-primary', () => {
+        clearErrorBlock();
+        runAnalysis();
+    }));
+    if (error.settings) {
+        actions.appendChild(makeErrorAction('Open settings', '', () => {
+            chrome.runtime.sendMessage({ action: 'OPEN_OPTIONS' });
+        }));
+    }
+    actions.appendChild(makeErrorAction('Copy details', '', copyDiagnostics));
+
+    block.appendChild(head);
+    if (error.detail) block.appendChild(detail);
+    block.appendChild(actions);
+    if (host.id === 'action-area') host.insertBefore(block, host.firstChild);
+    else host.appendChild(block);
+
+    // The block owns recovery while it is up, so there is only one way forward.
+    const genBtn = document.querySelector('.yt-timestamps-generate-button');
+    if (genBtn) {
+        genBtn.hidden = true;
+        genBtn.disabled = false;
+        genBtn.style.pointerEvents = '';
+        setGenerateButtonLabel(genBtn, 'Generate summary');
+    }
+}
+
 // Function to update the generate button state
-let _buttonResetTimeout = null;
 let _sweepTimeout = null;
-function updateGenerateButton(phase, message, keepOpen) {
+function updateGenerateButton(phase, payload) {
     const panel = _getPanel();
 
     // 'done' usually arrives after the summary has replaced the empty state
@@ -905,49 +1104,33 @@ function updateGenerateButton(phase, message, keepOpen) {
         _sweepTimeout = setTimeout(() => panel.classList.remove('yt-done-sweep'), 900);
     }
 
-    const genBtn = document.querySelector('.yt-timestamps-generate-button');
-    if (!genBtn) return;
-
-    // Clear any pending reset timeout
-    if (_buttonResetTimeout) {
-        clearTimeout(_buttonResetTimeout);
-        _buttonResetTimeout = null;
+    if (phase === 'error') {
+        if (panel) panel.classList.remove('yt-generating');
+        renderErrorBlock(normalizeError(payload));
+        return;
     }
 
-    const resetButton = () => {
-        genBtn.innerHTML = 'Generate summary';
-        genBtn.disabled = false;
-        genBtn.style.pointerEvents = '';
-        genBtn.classList.remove('yt-error-state');
-    };
+    // Any forward progress retires the previous failure.
+    clearErrorBlock();
+
+    const genBtn = document.querySelector('.yt-timestamps-generate-button');
+    if (!genBtn) return;
 
     switch (phase) {
         case 'extracting':
             genBtn.disabled = true;
-            genBtn.classList.remove('yt-error-state');
-            genBtn.innerHTML = '<span class="yt-spinner"></span>Extracting transcript...';
+            setGenerateButtonLabel(genBtn, 'Extracting transcript...', true);
             if (panel) panel.classList.add('yt-generating');
             break;
         case 'calling_api':
             genBtn.disabled = true;
-            genBtn.classList.remove('yt-error-state');
-            genBtn.innerHTML = '<span class="yt-spinner"></span>Generating summary...';
+            setGenerateButtonLabel(genBtn, 'Generating summary...', true);
             if (panel) panel.classList.add('yt-generating');
             break;
-        case 'error':
-            genBtn.classList.add('yt-error-state');
-            genBtn.innerHTML = message || 'Something went wrong';
-            if (panel) panel.classList.remove('yt-generating');
-            if (keepOpen) {
-                genBtn.disabled = true;
-                genBtn.style.pointerEvents = 'none';
-            } else {
-                genBtn.disabled = false;
-                _buttonResetTimeout = setTimeout(resetButton, 3000);
-            }
-            break;
         case 'done':
-            resetButton();
+            setGenerateButtonLabel(genBtn, 'Generate summary');
+            genBtn.disabled = false;
+            genBtn.style.pointerEvents = '';
             break;
     }
 }
@@ -1115,8 +1298,24 @@ function renderTimestampsUI(summaryText) {
             
             const timeLabel = document.createElement('span');
             timeLabel.className = 'yt-time-label';
-            timeLabel.innerHTML = `<span class="yt-time"><span class="yt-time-text">${time}</span></span> <span class="yt-title">${title}</span>`;
-            attachTitleTooltip(timeLabel.querySelector('.yt-title'));
+            // The title comes from the model, so it is inserted as text: build the
+            // spans here rather than interpolating into innerHTML, or a title
+            // containing angle brackets would be parsed as markup.
+            const timeWrap = document.createElement('span');
+            timeWrap.className = 'yt-time';
+            const timeTextEl = document.createElement('span');
+            timeTextEl.className = 'yt-time-text';
+            timeTextEl.textContent = time;
+            timeWrap.appendChild(timeTextEl);
+
+            const titleEl = document.createElement('span');
+            titleEl.className = 'yt-title';
+            titleEl.textContent = title;
+
+            timeLabel.appendChild(timeWrap);
+            timeLabel.appendChild(document.createTextNode(' '));
+            timeLabel.appendChild(titleEl);
+            attachTitleTooltip(titleEl);
             
             const expandBtn = document.createElement('span');
             expandBtn.textContent = '+';

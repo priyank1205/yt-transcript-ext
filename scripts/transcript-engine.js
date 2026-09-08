@@ -70,6 +70,10 @@ function panelHasSegments(panel) {
 }
 
 // Function to extract transcript from YouTube video
+// Failure codes below are the string values of ERROR_CODES in scripts/errors.js.
+// This file is a classic content script and cannot import that module, so the
+// codes travel as literals and the service worker resolves them into the
+// category the panel renders.
 async function extractTranscript() {
   const videoId = new URLSearchParams(window.location.search).get('v');
   const result = await extractPanelTranscript();
@@ -77,16 +81,16 @@ async function extractTranscript() {
   // unreadable transcripts need the player's caption track.
   if (result.success) return result;
   if (new URLSearchParams(window.location.search).get('v') !== videoId) {
-    return { success: false, error: 'Video changed. Please generate the summary again.' };
+    return { success: false, error: 'Video changed. Please generate the summary again.', code: 'video_changed' };
   }
   try {
     const captions = await chrome.runtime.sendMessage({ action: 'GET_PLAYER_CAPTIONS', videoId });
     if (new URLSearchParams(window.location.search).get('v') !== videoId) {
-      return { success: false, error: 'Video changed. Please generate the summary again.' };
+      return { success: false, error: 'Video changed. Please generate the summary again.', code: 'video_changed' };
     }
     return captions || result;
   } catch (err) {
-    return { success: false, error: 'Could not read captions. Please refresh the page and try again.' };
+    return { success: false, error: 'Could not read captions. Please refresh the page and try again.', code: 'captions_unreadable' };
   }
 }
 
@@ -108,7 +112,7 @@ async function extractPanelTranscript() {
         transcriptBtn = findTranscriptButton();
       }
     }
-    if (!transcriptBtn) return { success: false, error: "Sorry! This video has no captions" };
+    if (!transcriptBtn) return { success: false, error: "Sorry! This video has no captions", code: 'no_captions' };
 
     // 3. Open the panel; the waiting happens in step 4.
     transcriptBtn.click();
@@ -119,7 +123,7 @@ async function extractPanelTranscript() {
       // Don't leave a half-opened panel behind when extraction fails.
       logPanelDiagnostics();
       closeTranscriptPanel();
-      return { success: false, error: "Panel opened but no segments found." };
+      return { success: false, error: "Panel opened but no segments found.", code: 'captions_unreadable' };
     }
 
     // 5. Clean up: close whichever panel the segments turned up in
@@ -127,7 +131,7 @@ async function extractPanelTranscript() {
 
     return extractFromSegments(panelInfo.segments, panelInfo.type);
   } catch (err) {
-    return { success: false, error: "Extraction error: " + err.message };
+    return { success: false, error: "Extraction error: " + err.message, code: 'captions_unreadable' };
   }
 }
 
@@ -266,7 +270,7 @@ function extractFromSegments(segments, panelType) {
   }
 
   if (output.length === 0) {
-    return { success: false, error: "Could not parse any segments from the panel." };
+    return { success: false, error: "Could not parse any segments from the panel.", code: 'captions_unreadable' };
   }
 
   return { success: true, data: output };

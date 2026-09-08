@@ -24,6 +24,18 @@
         "/Users/priyank/Library/Mobile Documents/com~apple~CloudDocs/Documents/Coding/vibecoded/yt-transcript-ext"
       ],
       "port": 8849
+    },
+    {
+      "name": "panel-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8850",
+        "--directory",
+        "/Users/priyank/Documents/Coding/Vibecoding/yt-transcript-ext"
+      ],
+      "port": 8850
     }
   ]
 }
