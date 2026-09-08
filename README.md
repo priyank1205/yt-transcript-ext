@@ -9,8 +9,9 @@ YouTube videos are diamond mines of knowledge on the internet — tutorials, tal
 
 This extension gives you a **timestamped, sectioned AI-generated summary** directly inside the YouTube page. Click any summary line to seek the video to that moment. No tabs, no copy-paste, no friction.
 
-<!-- Screenshot: docs/panel.png — the generated panel in a YouTube sidebar.
-     Capture at ~402px panel width on a real video, dark theme, Quiet skin. -->
+![The Timestamped Summary panel sitting in the YouTube sidebar beside a playing video, showing its empty state with a Generate summary button](docs/screenshots/panel-on-video-page.jpg)
+
+<sup>Screenshots show a public video from the Dwarkesh Podcast.</sup>
 
 **Features:**
 
@@ -22,6 +23,24 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 - Collapse/expand the complete panel
 - Model selector with Auto mode (falls back across available configured providers)
 - Supports readable manual and auto-generated caption tracks, including members-only videos your signed-in account can play
+
+**A closer look:**
+
+Choose how much detail you want before generating. Brief for a quick read of what a video covers, In-depth when you intend to work through it.
+
+<img src="docs/screenshots/detail-selector.png" width="400" alt="The Detail selector open on In-depth, with Brief and Standard beside it, above the line 'Every topic, with concrete specifics.'">
+
+The result opens with a briefing card — a short overview, the video's runtime, how many points it found and how long they take to read — above the sectioned chapter list.
+
+<img src="docs/screenshots/summary-generated.png" width="400" alt="A generated summary: an overview card reading 1:43:12 video, 42 points, 6 min read, above sectioned timestamp rows such as 0:42 Transforming Electrons to Tokens">
+
+Click a row's timestamp to seek the video there, or expand it for the explanation behind the heading.
+
+<img src="docs/screenshots/timestamp-row-expanded.png" width="400" alt="A timestamp row expanded to show its explanation beneath the heading">
+
+Collapse the whole panel when you would rather just watch.
+
+<img src="docs/screenshots/panel-collapsed.png" width="400" alt="The panel collapsed to a single header row with a Start over control">
 
 **How it works:**
 
