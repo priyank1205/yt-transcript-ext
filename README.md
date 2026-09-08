@@ -1,9 +1,16 @@
-# YouTube Transcript Extractor
+# Timestamped Summary for YouTube
+
+[![CI](https://github.com/priyank1205/yt-transcript-ext/actions/workflows/ci.yml/badge.svg)](https://github.com/priyank1205/yt-transcript-ext/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+*Previously released as "YouTube Transcript Extractor".*
 
 YouTube videos are diamond mines of knowledge on the internet — tutorials, talks, deep dives, podcasts. But watching an hour-long video just to find one answer, or to decide if it's worth your time, is painfully inefficient.
 
 This extension gives you a **timestamped, sectioned AI-generated summary** directly inside the YouTube page. Click any summary line to seek the video to that moment. No tabs, no copy-paste, no friction.
 
+<!-- Screenshot: docs/panel.png — the generated panel in a YouTube sidebar.
+     Capture at ~402px panel width on a real video, dark theme, Quiet skin. -->
 
 **Features:**
 
@@ -37,19 +44,56 @@ After updating the extension, reload it on Chrome's Extensions page **and refres
 - Captured caption responses stay in the YouTube page's memory (at most four tracks, cleared on navigation) and are never persisted.
 - Copied diagnostics are stripped of keys, signed URLs and query strings before they reach the clipboard.
 
+**Install:**
+
+Chrome, Edge, Brave or any other Chromium browser. Not published to the Chrome
+Web Store — install it unpacked:
+
+1. Get the files: clone the repo, or download a release zip from the
+   [Releases page](https://github.com/priyank1205/yt-transcript-ext/releases)
+   and unzip it.
+2. Open `chrome://extensions` and turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the folder.
+4. Open a YouTube video — the **Timestamped Summary** panel appears in the sidebar.
+
+**Updating:** pull or download the new version over the same folder, click the
+reload arrow on the extension's card in `chrome://extensions`, then **refresh
+any open YouTube tab**. Caption capture starts with the page, so a tab that was
+already open is still running the previous version.
+
 **Setup:**
 
-1. Install the extension in Chrome
-2. Open the extension's settings (gear icon in the panel, or right-click the extension icon)
-3. Paste your API key for any of the supported providers (e.g. Gemini, Mistral)
-4. [Optional] Choose a model in the panel dropdown
+1. Open the extension's settings (gear icon in the panel, or right-click the extension icon)
+2. Paste your API key for any of the supported providers (e.g. Gemini, Mistral)
+3. [Optional] Choose a model in the panel dropdown
 
 Get a Gemini API key: https://aistudio.google.com/apikey
 
 Get a Mistral API key: https://console.mistral.ai/api-keys/
 
+You pay your provider directly for what you generate; the extension has no
+backend, no account and no keys of its own.
+
 **Development checks:**
 
-- Run `node --test tests/*.test.cjs` for transcript regression, caption capture/fallback, request routing, and navigation checks.
-- Run `node tests/serve-browser-tests.cjs` and open `http://127.0.0.1:8765/tests/caption-reader-browser.html` for JSON3/XML parsing and real fetch/XHR response-capture checks. The local caption endpoint succeeds once and refuses replays. These checks use fixture captions and make no YouTube or LLM requests.
+No dependencies and no build step; Node 20 or newer is all that is needed.
+
+- `npm run check` runs the manifest/version check and then the unit tests: transcript regression, caption capture/fallback, request routing, navigation, and summary validation.
+- `npm run test:browser` serves the browser harness — open `http://127.0.0.1:8765/tests/caption-reader-browser.html` for JSON3/XML parsing and real fetch/XHR response-capture checks. The local caption endpoint succeeds once and refuses replays. These checks use fixture captions and make no YouTube or LLM requests.
+- `npm run package` writes `dist/timestamped-summary-for-youtube-v<version>.zip` containing only the files the manifest loads.
 - After updating the unpacked extension, reload it on Chrome's Extensions page and refresh the YouTube tab. Verify a normal video and a captions-only video in an account with access, including clicking a summary timestamp.
+
+CI runs the same checks on Node 20 and 22 for every push and pull request, and
+attaches the built zip to the run.
+
+**Contributing:**
+
+Bug reports and suggestions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+for the local setup, the project layout, and the two boundaries worth keeping
+(API keys never reach a content script; model output never reaches `innerHTML`).
+When filing an issue, do not paste API keys: the panel's *Copy details* button
+already strips keys, signed URLs and query strings.
+
+**License:**
+
+[MIT](LICENSE). Use it, fork it, ship it — keep the copyright notice.

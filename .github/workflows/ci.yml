@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, experiment]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Checks (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No dependencies and no lockfile: the suite runs on node:test alone, so
+      # there is nothing to install before running it.
+      - name: Manifest and version check
+        run: npm run test:manifest
+
+      - name: Unit tests
+        run: npm test
+
+  package:
+    name: Release zip
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build package
+        run: npm run package
+
+      # Downloadable from the run's summary page, so a build can be installed
+      # and tried without checking out the repo.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-zip
+          path: dist/*.zip
+          if-no-files-found: error

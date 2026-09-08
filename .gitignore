@@ -2,3 +2,7 @@
 ROADMAP.md
 audit/
 .DS_Store
+
+# Build output and tooling
+dist/
+node_modules/
