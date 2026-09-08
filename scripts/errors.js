@@ -18,6 +18,7 @@ export const ERROR_CODES = {
   AUTH: 'auth',
   MODEL_UNAVAILABLE: 'model_unavailable',
   ENDPOINT: 'endpoint',
+  PERMISSION: 'permission',
   RATE_LIMIT: 'rate_limit',
   INPUT_TOO_LARGE: 'input_too_large',
   NETWORK: 'network',
@@ -63,6 +64,11 @@ const CATEGORIES = {
   [ERROR_CODES.ENDPOINT]: {
     title: 'The provider URL returned 404',
     detail: 'Check the base URL in settings — it usually ends in /v1/chat/completions.',
+    settings: true
+  },
+  [ERROR_CODES.PERMISSION]: {
+    title: 'This provider needs browser permission',
+    detail: 'Chrome has not granted access to that custom endpoint. Open settings, save the provider again, and allow the site when Chrome asks.',
     settings: true
   },
   [ERROR_CODES.RATE_LIMIT]: {

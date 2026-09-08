@@ -1,11 +1,30 @@
 // background/service-worker.js
 
-import { PROVIDERS, isRetiredModel } from '../scripts/providers.js';
+import { PROVIDERS, isRetiredModel, endpointOrigin } from '../scripts/providers.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 import { getPlayerCaptions } from '../scripts/caption-reader.js';
 import { apiError, classifyError, ERROR_CODES } from '../scripts/errors.js';
 import { parseTranscriptCues, unwrap, validateSummary } from '../scripts/summary-validator.js';
 import { planWindows } from '../scripts/transcript-windows.js';
+
+// Content scripts can read chrome.storage.local by default, and this store
+// holds every provider API key. The panel is a content script: it runs in
+// YouTube's own page, so anything it may read is one page-level compromise away
+// from being read by the page. Nothing it renders needs a key — it asks the
+// background for a small set of non-secret preferences instead (see
+// GET_PANEL_PREFS) — so the store is closed to page contexts entirely.
+//
+// Runs on every service-worker start, not just on install: the setting is cheap
+// to reassert and this way a profile that predates it is repaired without
+// waiting for an update.
+try {
+  chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })
+    ?.catch?.((err) => console.warn('Could not restrict storage access:', err?.message));
+} catch (err) {
+  // Older Chrome without setAccessLevel: the panel still asks for prefs by
+  // message and never reads a key itself, so nothing here depends on it.
+  console.warn('Storage access level unavailable:', err?.message);
+}
 
 // First-run onboarding: on fresh install, open the settings page and flag the
 // in-page tooltip that points new users to the settings gear icon. Every
@@ -283,6 +302,106 @@ function configuredProviderIds(allProviders, storage) {
   return Object.keys(allProviders).filter((id) => hasCredential(allProviders[id], storage));
 }
 
+// The built-in registry plus whatever custom endpoints the user has saved.
+async function loadProviders() {
+  const { CUSTOM_PROVIDERS } = await chrome.storage.local.get(['CUSTOM_PROVIDERS']);
+  const allProviders = { ...PROVIDERS };
+  for (const cp of CUSTOM_PROVIDERS || []) {
+    allProviders[cp.id] = { ...cp, clientClass: OpenAICompatibleClient };
+  }
+  return allProviders;
+}
+
+// A custom endpoint is reachable only while its optional host permission is
+// granted. Chrome answers a revoked one with an ordinary network failure, which
+// the panel would report as "couldn't reach the provider" — a true statement
+// that sends the user to check their connection instead of their settings.
+async function hasEndpointPermission(provider) {
+  const origin = endpointOrigin(provider);
+  if (!origin) return true;   // built-in: declared in the manifest
+  try {
+    return await chrome.permissions.contains({ origins: [origin] });
+  } catch {
+    // No permissions API to ask (tests, older Chrome): let the request itself
+    // decide rather than blocking a provider that may well work.
+    return true;
+  }
+}
+
+// --- Panel preferences -------------------------------------------------------
+//
+// The one thing the panel is allowed to know about settings. It gets the four
+// display preferences it actually renders and a single boolean for whether any
+// provider is set up — never a key, an endpoint, or even which providers exist.
+// That boolean is all the old `storage.local.get(null)` in the panel was really
+// asking for, and it cost every key in the profile to answer.
+
+// Written from the page side, so each one is named and shape-checked here.
+const WRITABLE_PANEL_PREFS = {
+  summaryLength: {
+    storageKey: 'SUMMARY_LENGTH',
+    accepts: (value) => ['brief', 'standard', 'detailed'].includes(value)
+  },
+  showSettingsHint: {
+    storageKey: 'SHOW_SETTINGS_HINT',
+    accepts: (value) => typeof value === 'boolean'
+  }
+};
+
+async function panelPrefs() {
+  const allProviders = await loadProviders();
+  const storage = await chrome.storage.local.get([
+    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_SETTINGS_HINT',
+    ...Object.values(allProviders).map((p) => p.storageKey)
+  ]);
+  return {
+    summaryLength: storage.SUMMARY_LENGTH || 'standard',
+    theme: storage.THEME_PREF || 'system',
+    skin: storage.PANEL_SKIN || 'quiet',
+    showSettingsHint: !!storage.SHOW_SETTINGS_HINT,
+    // Whether generation is possible at all — the panel uses it to choose
+    // between "Generate summary" and "Set API keys".
+    providerReady: configuredProviderIds(allProviders, storage).length > 0
+  };
+}
+
+async function setPanelPref(name, value) {
+  // Own properties only: a name like "constructor" would otherwise resolve to
+  // something inherited and be treated as a writable preference.
+  const pref = Object.hasOwn(WRITABLE_PANEL_PREFS, String(name))
+    ? WRITABLE_PANEL_PREFS[name] : null;
+  if (!pref || !pref.accepts(value)) {
+    console.warn(`Refused panel preference write: ${name}`);
+    return false;
+  }
+  await chrome.storage.local.set({ [pref.storageKey]: value });
+  return true;
+}
+
+// Push the same payload to every open YouTube tab. This replaces the panel's
+// own storage.onChanged listener, which no longer fires now that the store is
+// restricted to trusted contexts.
+async function broadcastPanelPrefs() {
+  try {
+    const prefs = await panelPrefs();
+    const tabs = await chrome.tabs.query({ url: '*://*.youtube.com/*' });
+    await Promise.all(tabs.map((tab) =>
+      tab.id ? sendTabMessage(tab.id, { action: 'PREFS_CHANGED', prefs }) : null));
+  } catch (err) {
+    console.warn('Could not broadcast panel preferences:', err?.message);
+  }
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  // Keys and the custom-provider list change what `providerReady` answers; the
+  // rest are the preferences the panel renders directly.
+  const relevant = Object.keys(changes).some((key) =>
+    key.endsWith('_API_KEY') || key === 'CUSTOM_PROVIDERS' ||
+    ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN'].includes(key));
+  if (relevant) broadcastPanelPrefs();
+});
+
 // Is this message from the YouTube page itself, in its top frame? Origin and
 // frame are the parts of `sender` that identify who is talking, and neither can
 // change without a real navigation, so they are safe to read from `sender.url`.
@@ -336,11 +455,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
   if (request.action === "KEYS_CHANGED") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        sendTabMessage(tabs[0].id, { action: "KEYS_CHANGED" });
-      }
+    // Sent by the settings page after a save or delete. The storage listener
+    // above already covers it; this keeps the update immediate and reaches
+    // every YouTube tab rather than only the active one.
+    broadcastPanelPrefs();
+    return;
+  }
+  if (request.action === "GET_PANEL_PREFS") {
+    // Only the panel asks, and only the panel's own page may be answered.
+    if (!isYouTubeTopFrame(sender)) return;
+    panelPrefs().then(sendResponse).catch((err) => {
+      console.warn('Could not read panel preferences:', err?.message);
+      sendResponse(null);
     });
+    return true;
+  }
+  if (request.action === "SET_PANEL_PREF") {
+    if (isYouTubeTopFrame(sender)) {
+      setPanelPref(request.name, request.value)
+        .catch((err) => console.warn('Preference write failed:', err?.message));
+    }
     return;
   }
   if (request.action === "CANCEL_ANALYSIS") {
@@ -394,18 +528,18 @@ async function startAnalysis(request, sender, sendResponse) {
 
   // handleAnalysis claims the tab synchronously (beginRequest runs before its
   // first await), so the duplicate check above cannot be raced from here.
+  // No provider is passed: the panel cannot read settings any more, so the
+  // choice is resolved from storage inside handleAnalysis.
   const binding = { tabId, videoId, requestId };
-  handleAnalysis(binding, sendResponse, request.model, request.length).catch(err => {
+  handleAnalysis(binding, sendResponse, request.length).catch(err => {
     console.warn('Unhandled error in handleAnalysis:', err);
     endRequest(tabId, requestId);
     sendResponse({ success: false, error: classifyError(err, { stage: 'generation' }) });
   });
 }
 
-async function handleAnalysis(binding, sendResponse, modelName = 'gemini', length) {
-  const originalModel = modelName;
+async function handleAnalysis(binding, sendResponse, length) {
   const { tabId, videoId, requestId } = binding;
-  console.log(`handleAnalysis called with model: ${originalModel} for video ${videoId}`);
 
   const entry = beginRequest(binding);
   const signal = entry.controller.signal;
@@ -423,27 +557,25 @@ async function handleAnalysis(binding, sendResponse, modelName = 'gemini', lengt
 
   // Declared out here so the catch below can still report which provider and
   // model the request was using when it failed.
-  let resolvedModel = modelName;
+  let resolvedModel = null;
   let summaryOptions = null;
 
   try {
-    const initialStorage = await chrome.storage.local.get(['CUSTOM_PROVIDERS']);
-    const customProviders = initialStorage.CUSTOM_PROVIDERS || [];
-
-    const allProviders = { ...PROVIDERS };
-    customProviders.forEach(cp => {
-      allProviders[cp.id] = {
-        ...cp,
-        clientClass: OpenAICompatibleClient
-      };
-    });
+    const allProviders = await loadProviders();
 
     // Fetch all storage keys dynamically based on registry
     const storageKeys = Object.values(allProviders).map(p => p.storageKey);
     const modelKeys = Object.values(allProviders).map(p => `${p.id}_MODEL`);
-    storageKeys.push('SUMMARY_LENGTH');
+    storageKeys.push('SUMMARY_LENGTH', 'SELECTED_MODEL');
     storageKeys.push(...modelKeys);
     const storage = await chrome.storage.local.get(storageKeys);
+
+    // Which provider to use is a stored setting, read here rather than in the
+    // panel: the page side has no access to settings and no business knowing
+    // which providers are configured. `auto` is the default and the fallback.
+    const originalModel = storage.SELECTED_MODEL || 'auto';
+    resolvedModel = originalModel;
+    console.log(`handleAnalysis using provider: ${originalModel} for video ${videoId}`);
 
     // Resolve the summary "Detail" preset: explicit request wins, then the
     // persisted preference, then the standard default. Passed to every callAPI.
@@ -463,18 +595,18 @@ async function handleAnalysis(binding, sendResponse, modelName = 'gemini', lengt
           { stage: 'setup', detail: summaryOptions.length });
         return;
       }
-    } else if (!allProviders[modelName]) {
+    } else if (!allProviders[originalModel]) {
       await failAnalysis(binding, sendResponse,
-        { message: `Unknown provider "${modelName}".`, code: ERROR_CODES.MODEL_UNAVAILABLE },
-        { stage: 'setup', provider: modelName, detail: summaryOptions.length });
+        { message: `Unknown provider "${originalModel}".`, code: ERROR_CODES.MODEL_UNAVAILABLE },
+        { stage: 'setup', provider: originalModel, detail: summaryOptions.length });
       return;
-    } else if (!hasCredential(allProviders[modelName], storage)) {
+    } else if (!hasCredential(allProviders[originalModel], storage)) {
       await failAnalysis(binding, sendResponse,
-        { message: `API key not found for provider ${modelName}.`, code: ERROR_CODES.NO_KEY },
-        { stage: 'setup', provider: modelName, detail: summaryOptions.length });
+        { message: `API key not found for provider ${originalModel}.`, code: ERROR_CODES.NO_KEY },
+        { stage: 'setup', provider: originalModel, detail: summaryOptions.length });
       return;
     } else {
-      candidates = [modelName];
+      candidates = [originalModel];
     }
     resolvedModel = candidates[0];
     console.log(`Provider order: ${candidates.join(' -> ')}`);
@@ -534,6 +666,13 @@ async function handleAnalysis(binding, sendResponse, modelName = 'gemini', lengt
       if (stale()) return cancelled();
 
       try {
+        // A custom endpoint whose optional permission was declined or later
+        // revoked cannot be fetched. Say so plainly instead of letting Chrome
+        // report it as an unreachable network.
+        if (!(await hasEndpointPermission(provider))) {
+          throw apiError(ERROR_CODES.PERMISSION,
+            `Chrome has not granted access to the endpoint saved for ${provider.name}.`);
+        }
         console.log(`Calling ${providerId} API with model ${summaryOptions.modelId}...`);
         const client = getClient(providerId, allProviders);
         const apiKey = storage[provider.storageKey];

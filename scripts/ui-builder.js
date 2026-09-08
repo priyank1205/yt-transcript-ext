@@ -38,6 +38,67 @@ function _invalidateCache() {
     _cachedPanelBody = null;
 }
 
+// --- Panel preferences -------------------------------------------------------
+//
+// This file runs in YouTube's page as a content script, so it holds no
+// credentials and reads no settings: chrome.storage.local is closed to page
+// contexts (see the service worker's setAccessLevel call) precisely because it
+// holds every provider API key. What the panel needs is four display
+// preferences and one boolean saying whether generation is possible at all, and
+// it asks the background for exactly that.
+//
+// The last answer is kept here so the synchronous render paths have something
+// to draw with before the round trip resolves.
+const PANEL_PREF_DEFAULTS = {
+    summaryLength: 'standard',
+    theme: 'system',
+    skin: 'quiet',
+    showSettingsHint: false,
+    providerReady: false
+};
+let _panelPrefs = { ...PANEL_PREF_DEFAULTS };
+
+// Ask the background for the current preferences. The callback runs with the
+// last known values if the message fails (the extension reloading mid-session),
+// so a render is never blocked on it.
+function readPanelPrefs(callback) {
+    try {
+        chrome.runtime.sendMessage({ action: 'GET_PANEL_PREFS' }, (res) => {
+            if (!chrome.runtime.lastError && res) {
+                _panelPrefs = { ...PANEL_PREF_DEFAULTS, ...res };
+            }
+            if (callback) callback(_panelPrefs);
+        });
+    } catch {
+        if (callback) callback(_panelPrefs);
+    }
+}
+
+// Persist one of the two preferences the panel owns (the Detail level it last
+// generated with, and whether the first-run hint has been dismissed). The
+// background re-checks the name and the value; nothing else can be written from
+// here.
+function writePanelPref(name, value) {
+    _panelPrefs = { ..._panelPrefs, [name]: value };
+    try {
+        chrome.runtime.sendMessage({ action: 'SET_PANEL_PREF', name, value }, () => {
+            void chrome.runtime.lastError;   // fire and forget
+        });
+    } catch { /* The panel keeps the in-memory value either way. */ }
+}
+
+// A settings change elsewhere (the options page, another tab) arrives as a
+// PREFS_CHANGED broadcast, which is what the panel's own storage.onChanged
+// listener used to do before the store was closed to page contexts.
+function applyPanelPrefs(prefs) {
+    if (!prefs) return;
+    const previous = _panelPrefs;
+    _panelPrefs = { ...PANEL_PREF_DEFAULTS, ...prefs };
+    if (_panelPrefs.theme !== previous.theme) setPanelThemePref(_panelPrefs.theme);
+    if (_panelPrefs.skin !== previous.skin) setPanelSkinPref(_panelPrefs.skin);
+    if (_panelPrefs.providerReady !== previous.providerReady) refreshGenerateButtonMode();
+}
+
 // --- Panel theme (light/dark) ---------------------------------------------
 // The panel ships a dark skin by default and adds a `yt-theme-light` class to
 // the container when the resolved theme is light. Resolution: an explicit
@@ -551,13 +612,11 @@ function buildDetailChip() {
     render();
 
     // Sync to the stored default (whatever the user last generated with) once
-    // storage resolves. This only updates the in-memory selection/display.
-    if (chrome?.storage?.local) {
-        chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
-            const stored = DETAIL_OPTIONS.findIndex((o) => o.value === res.SUMMARY_LENGTH);
-            if (stored !== -1) select(stored);
-        });
-    }
+    // the background answers. This only updates the in-memory selection/display.
+    readPanelPrefs((prefs) => {
+        const stored = DETAIL_OPTIONS.findIndex((o) => o.value === prefs.summaryLength);
+        if (stored !== -1) select(stored);
+    });
 
     return wrap;
 }
@@ -586,8 +645,8 @@ function buildDetailBadge(meta) {
     // No metadata: an older cached render, or the dev harness. Fall back to the
     // stored preference, which is the best guess available.
     if (!generated) {
-        chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
-            const opt = DETAIL_OPTIONS.find((o) => o.value === res.SUMMARY_LENGTH);
+        readPanelPrefs((prefs) => {
+            const opt = DETAIL_OPTIONS.find((o) => o.value === prefs.summaryLength);
             if (opt) badge.textContent = opt.label;
         });
     }
@@ -705,21 +764,17 @@ function renderEmptyState(container) {
     // stored skin differs from the one this render assumed, rebuild once with
     // the right one — the re-entrant call sees the matching pref and settles.
     const renderedSkin = _skinPref;
-    chrome.storage.local.get(['THEME_PREF', 'PANEL_SKIN'], (res) => {
-        _themePref = res.THEME_PREF || 'system';
+    readPanelPrefs((prefs) => {
+        _themePref = prefs.theme;
         applyPanelTheme(_themePref, container);
-        _skinPref = res.PANEL_SKIN || 'quiet';
+        _skinPref = prefs.skin;
         applyPanelSkin(_skinPref, container);
         if (_skinPref !== renderedSkin) {
             renderEmptyState(container);
+            return;
         }
-    });
-
-    // First-run onboarding: point new users to the settings gear icon
-    chrome.storage.local.get(['SHOW_SETTINGS_HINT'], (res) => {
-        if (res.SHOW_SETTINGS_HINT) {
-            showSettingsHint(panel, gearIcon);
-        }
+        // First-run onboarding: point new users to the settings gear icon.
+        if (prefs.showSettingsHint) showSettingsHint(panel, gearIcon);
     });
 }
 
@@ -799,7 +854,7 @@ function showSettingsHint(panel, gearIcon) {
         hint.remove();
         gearIcon.classList.remove('yt-gear-pulse');
         gearIcon.removeEventListener('click', close);
-        chrome.storage.local.set({ SHOW_SETTINGS_HINT: false });
+        writePanelPref('showSettingsHint', false);
     };
 
     dismiss.addEventListener('click', (e) => {
@@ -875,15 +930,16 @@ function runAnalysis() {
     _activeRequest = request;
     updateGenerateButton('extracting');
 
-    // Send analysis request with timeout. Model is a global preference (settings
-    // page); length is the "Detail" preset currently selected in the panel chip.
+    // Send analysis request with timeout. Which provider runs is a settings-page
+    // preference the background resolves for itself; length is the "Detail"
+    // preset currently selected in the panel chip.
     //
     // The timeout measures silence, not total time. A long video is summarised
     // in parts, and the whole run legitimately outlasts any single-call budget —
     // but each finished part reports progress, so re-arming the timer on every
     // update still catches a genuinely stuck provider without cutting off a run
     // that is visibly working.
-    const sendAnalysis = (model, length, idleTimeout = 120000) => {
+    const sendAnalysis = (length, idleTimeout = 120000) => {
         return new Promise((resolve) => {
             let resolved = false;
             let timer = null;
@@ -904,7 +960,6 @@ function runAnalysis() {
 
             chrome.runtime.sendMessage({
                 action: "START_ANALYSIS",
-                model: model,
                 length: length,
                 videoId: request.videoId,
                 requestId: request.id
@@ -925,17 +980,14 @@ function runAnalysis() {
     // Main execution
     (async () => {
         try {
-            const prefs = await new Promise((resolve) =>
-                chrome.storage.local.get(['SELECTED_MODEL', 'SUMMARY_LENGTH'], resolve)
-            );
-            const model = prefs.SELECTED_MODEL || 'auto';
-            // Use the level selected in the chip; fall back to the stored default.
-            const length = _pendingDetail || prefs.SUMMARY_LENGTH || 'standard';
+            // Use the level selected in the chip; fall back to the last known
+            // stored default.
+            const length = _pendingDetail || _panelPrefs.summaryLength || 'standard';
             // Generating commits this level as the new sticky default, so the next
             // video opens on it. The summary's own badge reads the request, not this.
-            chrome.storage.local.set({ SUMMARY_LENGTH: length });
+            writePanelPref('summaryLength', length);
 
-            const result = await sendAnalysis(model, length);
+            const result = await sendAnalysis(length);
 
             // Another generation took ownership while this one was in flight:
             // its outcome is no longer this panel's to report.
@@ -957,21 +1009,19 @@ function runAnalysis() {
     })();
 }
 
-// Is any provider configured well enough to generate? A custom provider pointing
-// at a local endpoint is saved with an empty key on purpose, so "has a non-empty
-// key" is the wrong question — asking it rejected a perfectly usable local setup.
-function hasUsableProvider(res) {
-    if (Object.keys(res).some(key => key.endsWith('_API_KEY') && !!res[key])) return true;
-    const custom = Array.isArray(res.CUSTOM_PROVIDERS) ? res.CUSTOM_PROVIDERS : [];
-    return custom.some(cp => cp?.storageKey && typeof res[cp.storageKey] === 'string');
-}
-
 // Toggle the primary button between generating a summary and prompting for API keys.
-// With no key set, the button opens the settings page instead of running analysis.
+// With nothing configured, the button opens the settings page instead of running
+// analysis.
+//
+// Whether a provider is usable is decided in the background: it is the one place
+// that may read keys, and it already knows that a custom provider on a local
+// endpoint is saved with an empty key on purpose. The panel used to answer this
+// by reading the whole settings store — every key included — to compute a single
+// boolean.
 function setGenerateButtonMode(genBtn) {
     if (!genBtn) return;
-    chrome.storage.local.get(null, (res) => {
-        const hasKey = hasUsableProvider(res);
+    readPanelPrefs((prefs) => {
+        const hasKey = prefs.providerReady;
         const emptyText = document.querySelector('.yt-empty-text');
         if (hasKey) {
             genBtn.textContent = 'Generate summary';
@@ -1526,10 +1576,11 @@ function renderTimestampsUI(summaryText, meta) {
     });
 
     // Safety net: if the model returned section headers but not a single
-    // parseable point, log the raw output so a recurrence can be diagnosed
-    // (rather than silently showing a header-only wall).
+    // parseable point, note it — but only its shape. The summary is the content
+    // of someone's video, sometimes a members-only one, and the page console is
+    // shared with YouTube and every other extension on the tab.
     if (itemCount === 0) {
-        console.warn('[yt-timestamps] No timestamp items parsed from summary. Raw output:\n', summaryText);
+        console.warn(`[yt-timestamps] No timestamp items parsed from a ${summaryText.length}-character summary.`);
     }
 
     panelContent.appendChild(timestampsList);

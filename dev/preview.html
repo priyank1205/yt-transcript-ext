@@ -30,7 +30,11 @@
 
 <script>
   // --- chrome.* stubs -------------------------------------------------------
-  window.__prefs = { PANEL_SKIN: 'quiet', THEME_PREF: 'system', GEMINI_API_KEY: 'stub-key' };
+  // The panel reads no settings of its own: it asks the background for the few
+  // non-secret preferences it renders (GET_PANEL_PREFS), so the harness answers
+  // that message instead of stubbing a storage area.
+  window.__prefs = { skin: 'quiet', theme: 'system', summaryLength: 'standard',
+    showSettingsHint: false, providerReady: true };
 
   const SAMPLE_SUMMARY = [
     '#Geopolitical Shifts and Global Conflicts',
@@ -44,18 +48,16 @@
   ].join('\n');
 
   window.chrome = {
-    storage: {
-      local: {
-        get: (_keys, cb) => setTimeout(() => cb({ ...window.__prefs }), 0),
-        set: (obj) => Object.assign(window.__prefs, obj)
-      },
-      onChanged: { addListener() {} }
-    },
     runtime: {
       lastError: null,
       onMessage: { addListener() {} },
       sendMessage: (msg, cb) => {
-        if (msg && msg.action === 'START_ANALYSIS') {
+        if (msg && msg.action === 'GET_PANEL_PREFS') {
+          setTimeout(() => cb && cb({ ...window.__prefs }), 0);
+        } else if (msg && msg.action === 'SET_PANEL_PREF') {
+          window.__prefs[msg.name] = msg.value;
+          if (cb) cb();
+        } else if (msg && msg.action === 'START_ANALYSIS') {
           // Echo the request binding the way the background does, so the
           // panel's own stale-message checks are exercised here too.
           const meta = {
@@ -79,7 +81,7 @@
 <script src="../scripts/ui-builder.js"></script>
 <script>
   // Boot: apply the stubbed skin pref, then inject like content-main would.
-  setPanelSkinPref(window.__prefs.PANEL_SKIN);
+  setPanelSkinPref(window.__prefs.skin);
   injectSidebar(document.getElementById('secondary'));
 
   document.getElementById('t-dark').onclick = () => {
@@ -91,11 +93,11 @@
     setPanelThemePref('light');
   };
   document.getElementById('t-classic').onclick = () => {
-    window.__prefs.PANEL_SKIN = 'classic';
+    window.__prefs.skin = 'classic';
     setPanelSkinPref('classic');
   };
   document.getElementById('t-quiet').onclick = () => {
-    window.__prefs.PANEL_SKIN = 'quiet';
+    window.__prefs.skin = 'quiet';
     setPanelSkinPref('quiet');
   };
   document.getElementById('t-reset').onclick = () => {

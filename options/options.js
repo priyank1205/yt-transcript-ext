@@ -1,6 +1,6 @@
 // options/options.js
 
-import { PROVIDERS } from '../scripts/providers.js';
+import { PROVIDERS, normalizeEndpoint, endpointOrigin } from '../scripts/providers.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 
 // Reusable button-content markup
@@ -622,10 +622,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // --- Custom endpoint permissions -------------------------------------------
+  //
+  // The extension ships with host access to YouTube and the four built-in
+  // provider APIs, and nothing else. A custom endpoint is whatever the user
+  // types, so its access is asked for at the moment they save it and revoked
+  // when the provider is deleted. Chrome only shows the prompt during a user
+  // gesture, so these run straight out of the click handler, before any await.
+  function requestEndpointAccess(origin) {
+    if (!origin || !chrome.permissions?.request) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      chrome.permissions.request({ origins: [origin] }, (granted) => {
+        void chrome.runtime.lastError;
+        resolve(!!granted);
+      });
+    });
+  }
+
+  // Give back access to a host no saved provider points at any more.
+  async function releaseEndpointAccess(origin, remaining) {
+    if (!origin || !chrome.permissions?.remove) return;
+    if (remaining.some((cp) => endpointOrigin(cp) === origin)) return;
+    try {
+      await chrome.permissions.remove({ origins: [origin] });
+    } catch { /* Chrome refuses to drop a permission it never granted. */ }
+  }
+
   async function handleSave(p) {
     const key = p.input.value.trim();
     if (!key && !p.isCustom) {
       p.input.focus();
+      flashInvalid(p.input);
+      return;
+    }
+
+    // A saved custom provider can lose its host access (revoked in Chrome's own
+    // extension settings, or declined when it was added). Ask first, before any
+    // await spends the click's user gesture — Chrome resolves this immediately,
+    // without a prompt, when the permission is already held. Validation below is
+    // the first request that would fail without it.
+    const origin = endpointOrigin(p);
+    if (origin && !(await requestEndpointAccess(origin))) {
+      showToast(`Chrome needs permission to reach ${new URL(p.endpoint).origin}`);
       flashInvalid(p.input);
       return;
     }
@@ -837,17 +875,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cpModels = document.getElementById('cp-models');
     const cpHeaders = document.getElementById('cp-headers');
     const name = cpName.value.trim();
-    let endpoint = cpEndpoint.value.trim();
-    if (endpoint && !endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
-      endpoint = 'https://' + endpoint;
-    }
     const modelsList = cpModels.value.trim();
-    if (!name || !endpoint || !modelsList) {
+    if (!name || !cpEndpoint.value.trim() || !modelsList) {
       if (!name) flashInvalid(cpName);
-      if (!endpoint) flashInvalid(cpEndpoint);
+      if (!cpEndpoint.value.trim()) flashInvalid(cpEndpoint);
       if (!modelsList) flashInvalid(cpModels);
       return;
     }
+
+    // A bare host becomes https, and plain http is refused anywhere but
+    // localhost: a remote http endpoint would carry this key and every
+    // transcript in clear text.
+    const parsed = normalizeEndpoint(cpEndpoint.value);
+    if (parsed.error) {
+      flashInvalid(cpEndpoint);
+      showToast(parsed.error);
+      return;
+    }
+    const endpoint = parsed.url;
     
     let parsedHeaders = {};
     if (cpHeaders.value.trim()) {
@@ -875,6 +920,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       headers: Object.keys(parsedHeaders).length > 0 ? parsedHeaders : undefined
     };
 
+    // The extension holds no standing permission for this host, so ask for one
+    // now — straight out of the click, which is what lets Chrome show the
+    // prompt. Declining is a real answer: the provider is not saved, because it
+    // could never be reached.
+    requestEndpointAccess(parsed.origin).then((granted) => {
+      if (!granted) {
+        flashInvalid(cpEndpoint);
+        showToast(`Chrome needs permission to reach ${new URL(endpoint).origin}`);
+        return;
+      }
+      saveCustomProvider(newProvider, cpApiKey.value.trim());
+    });
+  }
+
+  function saveCustomProvider(newProvider, apiKey) {
     chrome.storage.local.get(['CUSTOM_PROVIDERS'], (res) => {
       const customProviders = res.CUSTOM_PROVIDERS || [];
       customProviders.push(newProvider);
@@ -884,8 +944,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       
       // Auto-save the key if provided
-      if (cpApiKey.value.trim()) {
-        saveObj[newProvider.storageKey] = cpApiKey.value.trim();
+      if (apiKey) {
+        saveObj[newProvider.storageKey] = apiKey;
       } else {
         saveObj[newProvider.storageKey] = ''; // explicit empty string for local
       }
@@ -906,6 +966,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (providerIndex > -1) {
         const cp = customProviders[providerIndex];
         customProviders.splice(providerIndex, 1);
+        // Nothing points at that host any more, so the extension should not
+        // keep the access it was granted for it.
+        releaseEndpointAccess(endpointOrigin(cp), customProviders);
         chrome.storage.local.remove([cp.storageKey, `${cp.id}_MODEL`], () => {
           chrome.storage.local.set({ CUSTOM_PROVIDERS: customProviders }, () => {
             loadAndRenderProviders();

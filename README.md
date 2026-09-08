@@ -27,6 +27,15 @@ The existing transcript-panel flow is tried first. If it fails, the extension re
 
 After updating the extension, reload it on Chrome's Extensions page **and refresh the YouTube tab** so caption capture starts before the player loads captions. Keep **CC** enabled, let some captions appear, and click **Generate summary**. Members-only videos require your account to have access; caption availability alone does not guarantee a readable track. Active live streams are not supported by the caption fallback.
 
+**Permissions and data handling:**
+
+- Site access is limited to `youtube.com` and the four built-in provider APIs (Gemini, OpenAI, Anthropic, Mistral). There is no all-sites permission.
+- A custom provider is the one endpoint the extension cannot know in advance, so Chrome asks for access to that host when you save it, and the permission is handed back when you delete it. Remote endpoints must use https; plain http is accepted only for localhost.
+- API keys, preferences and stats live in this browser's `storage.local`, which is restricted to the extension's own pages. The in-page panel cannot read it: it asks the background for the few display preferences it renders plus one boolean saying whether any provider is configured.
+- The transcript is sent to the provider that generates the summary. In **Auto** mode that is whichever configured provider runs, and if the first one fails the transcript is sent to the next — members-only videos included. Keys being local is not local AI: the summarizing happens on the provider's servers unless you point a custom provider at a local endpoint.
+- Captured caption responses stay in the YouTube page's memory (at most four tracks, cleared on navigation) and are never persisted.
+- Copied diagnostics are stripped of keys, signed URLs and query strings before they reach the clipboard.
+
 **Setup:**
 
 1. Install the extension in Chrome

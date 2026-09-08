@@ -1384,7 +1384,11 @@
       </template>
         <p class="privacy-note">
           <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-          Keys are stored locally in your browser and only sent to the provider's API.
+          Keys stay in this browser and are sent only to the provider they belong to.
+          The transcript goes to whichever provider generates the summary — with
+          <strong>Auto</strong>, that is any provider you have configured here, including
+          for members-only videos. Summarizing happens on the provider's servers unless you
+          point a custom provider at a local endpoint.
         </p>
       </section>
 
@@ -1458,15 +1462,23 @@
           </div>
           <div class="about-row">
             <span class="about-row-label">How it works</span>
-            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Google Gemini or Mistral, using your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
+            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Gemini, OpenAI, Anthropic, Mistral, or your own endpoint — always with your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
           </div>
           <div class="about-row">
             <span class="about-row-label">Detail &amp; theme</span>
             <span class="about-row-value">Dial each summary from a quick skim to a thorough breakdown with the Detail control in the panel header. The panel follows YouTube's light or dark theme on its own — override it any time under Appearance.</span>
           </div>
           <div class="about-row">
-            <span class="about-row-label">Privacy</span>
-            <span class="about-row-value">Your API keys and stats live only in your browser's local storage, never on a server of mine. Transcripts are sent only to the provider you choose, and nowhere else.</span>
+            <span class="about-row-label">What is sent where</span>
+            <span class="about-row-value">Your API keys, preferences and stats live only in this browser's local storage, never on a server of mine — and only the extension's own pages can read them, not the YouTube page. The transcript is sent to the provider that generates the summary, and nowhere else. On <strong>Auto</strong> that provider is chosen from the ones you have configured, and if the first one fails the transcript is sent to the next — members-only videos included. Keys being local is not the same as local AI: summarizing runs on the provider's servers unless you have pointed a custom provider at a local endpoint.</span>
+          </div>
+          <div class="about-row">
+            <span class="about-row-label">Captions</span>
+            <span class="about-row-value">When YouTube's transcript panel is unavailable, the extension reads the caption track the player already loaded for the video you are watching. Those caption responses stay in that page's memory — at most four tracks, cleared as soon as you navigate — and go nowhere except to your chosen provider, as the transcript.</span>
+          </div>
+          <div class="about-row">
+            <span class="about-row-label">Site access</span>
+            <span class="about-row-value">The extension can reach youtube.com and the four built-in provider APIs, and nothing else. Adding a custom provider asks Chrome for access to that one endpoint, and deleting the provider hands it back. Remote endpoints must use https — plain http is allowed only for localhost.</span>
           </div>
         </div>
 

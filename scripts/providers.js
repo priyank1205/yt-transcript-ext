@@ -110,3 +110,68 @@ export function isRetiredModel(providerId, modelId) {
   if (!patterns || !modelId) return false;
   return patterns.some((pattern) => pattern.test(modelId));
 }
+
+// --- Custom endpoints --------------------------------------------------------
+//
+// A custom provider is the one address the extension cannot know in advance, so
+// it is also the only one that needs a permission at runtime. Two rules apply
+// before it is saved:
+//
+//   * plain http is refused except on the loopback host, because a remote http
+//     endpoint would carry the user's key and the video's transcript in clear
+//     text over the network;
+//   * the origin is turned into a match pattern, so the options page can ask
+//     for access to exactly that host instead of the extension holding a
+//     standing permission for every site.
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+export function isLoopbackHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return LOOPBACK_HOSTS.has(host) || host.endsWith('.localhost');
+}
+
+/**
+ * Validate a user-entered endpoint and derive the host permission it needs.
+ *
+ * @param {string} raw
+ * @returns {{url: string, origin: string} | {error: string}}
+ */
+export function normalizeEndpoint(raw) {
+  let text = String(raw ?? '').trim();
+  if (!text) return { error: 'Enter the provider\'s endpoint URL.' };
+  // A scheme that is neither http nor https is a mistake, not a host: prefixing
+  // https to "ftp://host/v1" would parse as the host "ftp" and save silently.
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(text);
+  if (scheme && !/^https?$/i.test(scheme[1])) {
+    return { error: 'Use an http(s) endpoint URL.' };
+  }
+  // A bare host is the common way to type one; assume the secure scheme rather
+  // than the permissive one.
+  if (!scheme) text = `https://${text}`;
+
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return { error: 'That endpoint is not a valid URL.' };
+  }
+  if (!url.hostname) return { error: 'That endpoint is not a valid URL.' };
+  if (url.protocol === 'http:' && !isLoopbackHost(url.hostname)) {
+    return { error: 'Use https for a remote endpoint — http is only allowed for localhost.' };
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return { error: 'Use an http(s) endpoint URL.' };
+  }
+  return { url: url.href, origin: `${url.origin}/*` };
+}
+
+// The match pattern a saved provider's requests need. Built-in providers are in
+// the manifest; only a custom endpoint has an optional permission to check.
+export function endpointOrigin(provider) {
+  if (!provider?.isCustom || !provider.endpoint) return null;
+  try {
+    return `${new URL(provider.endpoint).origin}/*`;
+  } catch {
+    return null;
+  }
+}

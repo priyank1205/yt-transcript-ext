@@ -8,28 +8,11 @@ function initApp() {
     window.addEventListener('yt-navigate-start', resetSidebar);
     window.addEventListener('yt-navigate-finish', handleNavigation);
 
-    // Keep the panel in sync when API keys change (fires across tabs, e.g. after
-    // saving a key on the settings page): flip the primary button between
-    // "Generate summary" and "Set API keys".
-    chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== 'local') return;
-        // Any provider's key, and the custom-provider list: naming two of them
-        // meant configuring OpenAI or Anthropic left the button saying "Set API
-        // keys" until the page was reloaded.
-        const providerChanged = Object.keys(changes).some(key => key.endsWith('_API_KEY')) ||
-            !!changes.CUSTOM_PROVIDERS;
-        if (providerChanged) {
-            if (typeof refreshGenerateButtonMode === 'function') refreshGenerateButtonMode();
-        }
-        // Appearance override changed (e.g. from the settings tab): re-theme the panel.
-        if (changes.THEME_PREF && typeof setPanelThemePref === 'function') {
-            setPanelThemePref(changes.THEME_PREF.newValue || 'system');
-        }
-        // Design skin changed (Classic vs Quiet preview): re-skin the panel live.
-        if (changes.PANEL_SKIN && typeof setPanelSkinPref === 'function') {
-            setPanelSkinPref(changes.PANEL_SKIN.newValue || 'quiet');
-        }
-    });
+    // Settings live in chrome.storage.local alongside every API key, and that
+    // store is closed to content scripts. So the panel is told about changes
+    // rather than watching for them: the background sends PREFS_CHANGED (handled
+    // below) with the display preferences and a single "is anything configured"
+    // boolean, and nothing secret crosses into the page.
 
     // Initial check
     handleNavigation();
@@ -113,9 +96,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         sendResponse({ success: true });
         return true;
-    } else if (request.action === "KEYS_CHANGED") {
-        if (typeof refreshGenerateButtonMode === 'function') {
-            refreshGenerateButtonMode();
+    } else if (request.action === "PREFS_CHANGED") {
+        // A key saved on the settings page, an appearance override, or the
+        // Detail default changing in another tab. Re-theme, re-skin, and flip
+        // the primary button between "Generate summary" and "Set API keys".
+        if (typeof applyPanelPrefs === 'function') {
+            applyPanelPrefs(request.prefs);
         }
         sendResponse({ success: true });
         return true;
