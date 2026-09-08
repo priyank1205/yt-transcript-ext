@@ -730,6 +730,9 @@ async function handleAnalysis(binding, sendResponse, length) {
       length: summaryOptions.length,
       language: summaryOptions.language || 'en',
       points: summary.points.length,
+      // The panel's briefing rail reports the video's length. It reads the
+      // player when there is one; this covers a render that beats the player.
+      durationMinutes: summaryOptions.durationMinutes,
       generatedAt: Date.now()
     };
     console.log('Sending RENDER_TIMESTAMPS');

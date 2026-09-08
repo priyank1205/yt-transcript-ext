@@ -9,6 +9,7 @@ This extension gives you a **timestamped, sectioned AI-generated summary** direc
 
 - Extracts timestamped text from YouTube's transcript panel, with a player-caption fallback when the transcript is missing or unreadable
 - Generates a structured, sectioned summary using an LLM (supports multiple providers like Gemini, Mistral, etc.)
+- Opens with a briefing card above the chapter list: a short overview of the video, the runtime, the number of points and the reading time, and the detail level used
 - Every summary point is linked to its exact video timestamp — click to seek
 - Expand a summary point to see in detail
 - Collapse/expand the complete panel

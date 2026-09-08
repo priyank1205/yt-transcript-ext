@@ -28,6 +28,22 @@ const MIN_SURVIVING_SHARE = 0.5;
 // summary point. Hours are optional; minutes and seconds are two digits.
 const TIME_PATTERN = /^(?:(\d{1,3}):)?(\d{1,2}):(\d{2})$/;
 
+// The overview line the prompt asks for: a leading ">" and the sentences that
+// answer "what is this video" before any chapter is opened. `Overview:` is
+// accepted too — models reach for the label even when told not to, and a
+// recognisable line is worth more than a strict one.
+const OVERVIEW_LINE = /^>+\s*(.+)$/;
+const OVERVIEW_LABEL = /^overview\s*[:\u2014-]\s*(.+)$/i;
+
+// The overview is a glance, not a second summary. Anything past this is a model
+// that misread the instruction, and the panel would have to clamp it anyway —
+// so it is cut here, at a sentence boundary where one is available.
+const MAX_OVERVIEW_CHARS = 600;
+
+// A windowed run contributes one line per part; more than this many is not a
+// video summarised in parts, it is a stray ">" on every paragraph.
+const MAX_OVERVIEW_LINES = 12;
+
 export function parseTimestamp(label) {
   const match = TIME_PATTERN.exec(String(label || '').trim());
   if (!match) return null;
@@ -106,15 +122,33 @@ export function unwrap(raw) {
   return text.trim();
 }
 
+// Join the overview lines a reply carried into the single paragraph the panel
+// shows, and hold it to a length that belongs above a chapter list.
+function joinOverview(parts) {
+  // Each part of a windowed run contributes its own sentence; a model that
+  // ended one without a full stop would otherwise run it into the next.
+  const text = parts
+    .map((part) => (/[.!?…]$/.test(part) ? part : `${part}.`))
+    .join(' ').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  if (text.length <= MAX_OVERVIEW_CHARS) return text;
+  const head = text.slice(0, MAX_OVERVIEW_CHARS);
+  // Prefer ending on a sentence the model actually finished.
+  const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+  return stop > MAX_OVERVIEW_CHARS / 2 ? head.slice(0, stop + 1) : `${head.trimEnd()}…`;
+}
+
 /**
- * Parse the model's output into headings and points, without judging whether
- * the timestamps are real. Exported so the shape can be tested on its own.
+ * Parse the model's output into an overview, headings and points, without
+ * judging whether the timestamps are real. Exported so the shape can be tested
+ * on its own.
  *
- * @returns {{sections: Array<{heading: string|null, points: Array}>, points: Array}}
+ * @returns {{overview: string|null, sections: Array<{heading: string|null, points: Array}>, points: Array}}
  */
 export function parseSummary(raw) {
   const sections = [];
   const points = [];
+  const overview = [];
   let current = null;
 
   const openSection = (heading) => {
@@ -123,15 +157,32 @@ export function parseSummary(raw) {
     return current;
   };
 
-  for (const line of unwrap(raw).split('\n')) {
-    // Same normalisation the renderer applies, so what validates here is what
-    // renders there: no backticks, list bullets or bold markers.
-    let clean = line.replace(/`+/g, '').trim();
-    if (!clean) continue;
-    clean = clean.replace(/^[-*•]\s+/, '').replace(/\*\*/g, '').trim();
+  // Normalised up front rather than in the loop, because an overview line is
+  // recognised partly by what follows it. Same normalisation the renderer
+  // applies, so what validates here is what renders there: no backticks, list
+  // bullets or bold markers.
+  const lines = unwrap(raw).split('\n')
+    .map((line) => line.replace(/`+/g, '').trim().replace(/^[-*•]\s+/, '').replace(/\*\*/g, '').trim())
+    .filter(Boolean);
+
+  for (let i = 0; i < lines.length; i++) {
+    const clean = lines[i];
 
     if (clean.startsWith('#')) {
       openSection(clean.replace(/^#+/, '').trim());
+      continue;
+    }
+
+    // An overview line is only an overview where one belongs: at the top of the
+    // reply, or at the top of a part in a windowed run — which, once the parts
+    // are joined, is a line sitting immediately before a section heading. A ">"
+    // between two points is formatting drift, and taking it would put a stray
+    // sentence in the panel's gist.
+    const gist = OVERVIEW_LINE.exec(clean) || OVERVIEW_LABEL.exec(clean);
+    if (gist) {
+      const opensAPart = !current || current.points.length === 0 ||
+        (lines[i + 1] || '').startsWith('#');
+      if (opensAPart && overview.length < MAX_OVERVIEW_LINES) overview.push(gist[1].trim());
       continue;
     }
 
@@ -151,12 +202,16 @@ export function parseSummary(raw) {
     points.push(point);
   }
 
-  return { sections, points };
+  return { overview: joinOverview(overview), sections, points };
 }
 
-// Rebuild the canonical text the renderer parses, from validated points only.
-function toText(sections) {
+// Rebuild the canonical text the renderer parses, from the overview and the
+// validated points. The overview travels inside the summary text rather than
+// beside it because that text is the one thing every consumer already carries:
+// the render message, the panel's per-video cache, and a copy of the summary.
+function toText(sections, overview) {
   const lines = [];
+  if (overview) lines.push(`>${overview}`);
   for (const section of sections) {
     if (!section.points.length) continue;
     if (section.heading) lines.push(`#${section.heading}`);
@@ -190,7 +245,8 @@ function coverageGap(points, first, last) {
  * Throws a categorised error (see scripts/errors.js) when the output is empty,
  * truncated, unparseable, or timestamped against a timeline that isn't this
  * video's. Otherwise returns the repaired summary: points snapped to their real
- * cues, out-of-range and out-of-order rows dropped, empty sections removed.
+ * cues, out-of-range and out-of-order rows dropped, empty sections removed, and
+ * the overview line (when the model wrote one) carried in the returned text.
  *
  * @param {string} raw            the model's reply
  * @param {Array}  cues           parseTranscriptCues(transcript)
@@ -280,5 +336,10 @@ export function validateSummary(raw, cues = [], options = {}) {
       `${formatTimestamp(largestGap.to)} (${Math.round(largestGap.seconds / 60)} minutes uncovered).`);
   }
 
-  return { text: toText(sections), sections, points, dropped, warnings, largestGap };
+  // The overview is the model's own prose about the video, never a timestamp
+  // claim, so nothing here can verify it the way a point is verified. It is
+  // shown as what it is — a summary of what was said — and its absence is not a
+  // failure: an older cached summary, or a reply that skipped the line, simply
+  // renders the chapter list on its own.
+  return { text: toText(sections, parsed.overview), overview: parsed.overview, sections, points, dropped, warnings, largestGap };
 }

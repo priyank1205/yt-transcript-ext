@@ -37,6 +37,8 @@
     showSettingsHint: false, providerReady: true };
 
   const SAMPLE_SUMMARY = [
+    // The overview line the validator emits above the sections (backlog #9).
+    '>The speaker argues that defence manufacturing, not consumer technology, drives the next economic cycle, and that India\'s advantage will be cultural rather than industrial. Predictions are framed as readings, not forecasts, and the closing hour tests a long-horizon call.',
     '#Geopolitical Shifts and Global Conflicts',
     "[02:04] - China's Strategic Preparations: Intelligence sources indicate that China is actively preparing for a major conflict, though it remains unclear whether these preparations target India or the United States.",
     '[02:29] - India-US Relations: A direct war between the US and India is unlikely, but a persistent trade war is impacting India\'s economy as part of a broader cycle of global tension.',
@@ -62,7 +64,9 @@
           // panel's own stale-message checks are exercised here too.
           const meta = {
             videoId: msg.videoId, requestId: msg.requestId,
-            provider: 'demo', modelId: 'demo-model-1', length: msg.length, points: 8
+            provider: 'demo', modelId: 'demo-model-1', length: msg.length, points: 8,
+            // The briefing rail reads the video's length and the summary's age.
+            durationMinutes: 72.7, generatedAt: Date.now()
           };
           window.__lastRequest = meta;
           setTimeout(() => updateGenerateButton('calling_api'), 600);

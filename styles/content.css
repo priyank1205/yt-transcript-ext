@@ -135,31 +135,46 @@
   color: #ccc;
 }
 
-/* Reset ("start over") button — sits next to the title on the summary header.
-   Muted by default, red accent + spin on hover, matching the gear treatment. */
+/* "Start over" — next to the title on the summary header. Labelled, because the
+   action discards a summary that cost an API call: an icon alone left people
+   guessing between "regenerate" and "refresh". */
 .yt-timestamps-panel-header .yt-reset-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 2px;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
   margin: 0;
   background: none;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   cursor: pointer;
   color: #888;
-  opacity: 0.75;
-  transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .yt-timestamps-panel-header .yt-reset-btn svg {
   display: block;
+  flex: 0 0 auto;
+  position: relative;
+  top: -0.5px;
 }
 
 .yt-timestamps-panel-header .yt-reset-btn:hover {
   opacity: 1;
-  color: #ff4d4d;
-  transform: rotate(-30deg);
+  color: #ff6b6b;
+  background: rgba(255, 77, 77, 0.1);
+  border-color: rgba(255, 77, 77, 0.32);
+}
+
+.yt-timestamps-panel-header .yt-reset-btn:focus-visible {
+  outline: 2px solid #ff6b6b;
+  outline-offset: 2px;
 }
 
 /* Accordion Toggle Icon */
@@ -579,6 +594,185 @@
   padding: 0 14px 14px;
 }
 
+/* The briefing card — what this summary is, above the chapter list: the
+   overview, then a rail of the figures behind it. Three lines collapsed;
+   "Show more" is revealed by ui-builder.js only when the text is clipped. */
+.yt-gist {
+  padding: 12px 0 12px;
+  border-bottom: 1px solid #333;
+  margin-bottom: 4px;
+}
+
+/* The one raised surface in the panel: a fill and a hairline, never a shadow —
+   inside a 402px column a shadow reads as a modal. */
+.yt-brief {
+  background: #171717;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 13px 14px 11px;
+}
+
+.yt-gist-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  margin-bottom: 6px;
+}
+
+.yt-gist-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e0dcdc;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.yt-brief.yt-gist-expanded .yt-gist-text {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: none;
+}
+
+/* Rail: only figures the extension already has — the video's length, the points
+   that survived validation, and the reading time at 200 wpm. */
+.yt-brief-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid #333;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #8a8a8a;
+}
+
+/* First child when the model returned no overview: nothing to divide from. */
+.yt-brief-rail:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.yt-brief-stat b {
+  color: #c4bebe;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Detail level, next to the numbers it explains. Pressing it discloses the
+   model and the summary's age. */
+.yt-brief-detail {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ededed;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.yt-gist-actions-solo .yt-brief-detail { margin-left: 0; }
+
+.yt-brief-detail:hover,
+.yt-brief-detail.yt-open {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.yt-brief-detail-static {
+  cursor: default;
+}
+
+.yt-brief-detail-static:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.yt-brief-detail:focus-visible {
+  outline: 2px solid #ff6b6b;
+  outline-offset: 2px;
+}
+
+.yt-brief-caret {
+  display: flex;
+  align-items: center;
+  opacity: 0.65;
+  transition: transform 0.18s ease;
+}
+
+.yt-brief-detail.yt-open .yt-brief-caret {
+  transform: rotate(180deg);
+}
+
+.yt-brief-meta {
+  margin-top: 9px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8a8a8a;
+  word-break: break-word;
+}
+
+.yt-brief-meta[hidden] {
+  display: none;
+}
+
+.yt-gist-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* The toggle and its separator are hidden by the `hidden` property; say so at a
+   specificity YouTube's own button rules can't undo. */
+.yt-gist-actions [hidden] {
+  display: none;
+}
+
+.yt-gist-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8a8a8a;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.yt-gist-link:hover {
+  color: #e0dcdc;
+  text-decoration: underline;
+}
+
+.yt-gist-link:focus-visible {
+  outline: 2px solid #ff6b6b;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.yt-gist-sep {
+  color: #5a5a5a;
+  font-size: 12px;
+}
+
 /* Glow effect for timestamp items */
 .yt-glow-border {
   position: absolute;
@@ -822,15 +1016,18 @@
   color: #fff;
 }
 
-/* Reset button sits on the red light-theme header bar — keep it white. */
+/* "Start over" sits on the red light-theme header bar — keep it white. */
 .yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn {
   color: #fff;
-  opacity: 0.85;
+  opacity: 0.9;
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .yt-timestamps-container.yt-theme-light .yt-timestamps-panel-header .yt-reset-btn:hover {
   color: #fff;
   opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .yt-timestamps-container.yt-theme-light .yt-accordion-toggle-icon {
@@ -842,6 +1039,66 @@
   color: rgba(0, 0, 0, 0.5) !important;
   opacity: 1 !important;
   border-bottom-color: #d4d4d4 !important;
+}
+
+/* Briefing card */
+.yt-timestamps-container.yt-theme-light .yt-gist {
+  border-bottom-color: #d4d4d4;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief {
+  background: #fbfbfb;
+  border-color: #e0dcdc;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-rail {
+  border-top-color: #e4e0e0;
+  color: #767676;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-stat b {
+  color: #3f3f3f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-detail {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #3f3f3f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-detail:hover,
+.yt-timestamps-container.yt-theme-light .yt-brief-detail.yt-open {
+  background: rgba(0, 0, 0, 0.09);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-detail-static:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-brief-meta {
+  color: #767676;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-gist-eyebrow {
+  color: #757575;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-gist-text {
+  color: #212121;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-gist-link {
+  color: #606060;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-gist-link:hover {
+  color: #0f0f0f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-gist-sep {
+  color: #b0b0b0;
 }
 
 /* Accordion (expanded description) — nested detail under a white item, so a

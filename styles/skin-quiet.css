@@ -126,10 +126,17 @@
 .yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .yt-reset-btn {
   color: var(--q-text-3);
   opacity: 1;
+  border-color: transparent;
 }
 
 .yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .yt-reset-btn:hover {
   color: var(--q-accent-text);
+  background: var(--q-accent-tint);
+  border-color: transparent;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamps-panel-header .yt-reset-btn:focus-visible {
+  outline: 2px solid var(--q-focus);
 }
 
 /* Detail chip — borderless filled pill, the YouTube chip idiom */
@@ -358,6 +365,95 @@
   padding: 2px 0 10px;
 }
 
+/* Briefing card: the panel's first block. Surfaces over strokes, so the card is
+   a step of elevation and a hairline — the shadow the Classic skin would use
+   here reads as a modal at this width. */
+.yt-timestamps-container.yt-skin-quiet .yt-gist {
+  padding: 12px 12px 14px;
+  margin: 0;
+  border-bottom: 1px solid var(--q-divider);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief {
+  background: var(--q-raised);
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  padding: 13px 14px 11px;
+}
+
+/* Light Quiet has no raised tone of its own — the panel is already white — so
+   the card steps down instead of up. */
+.yt-timestamps-container.yt-skin-quiet.yt-theme-light .yt-brief {
+  background: #fafafa;
+  border-color: var(--q-border);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-rail {
+  border-top-color: var(--q-divider);
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-stat b {
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-detail {
+  background: var(--q-chip);
+  border-color: transparent;
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-detail:hover,
+.yt-timestamps-container.yt-skin-quiet .yt-brief-detail.yt-open {
+  background: var(--q-chip-hover);
+  border-color: transparent;
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-detail-static:hover {
+  background: var(--q-chip);
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-detail:focus-visible {
+  outline: 2px solid var(--q-focus);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-brief-meta {
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.7px;
+  color: var(--q-text-3);
+  margin-bottom: 8px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-link {
+  color: var(--q-text-3);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-link:hover {
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-link:focus-visible {
+  outline: 2px solid var(--q-focus);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-gist-sep {
+  color: var(--q-text-3);
+  opacity: 0.6;
+}
+
 .yt-timestamps-container.yt-skin-quiet .yt-section-header {
   font-size: 11px !important;
   font-weight: 500 !important;
@@ -525,6 +621,7 @@
 /* Rows and section headers cascade in when a summary renders. --yt-i is the
    render-order index set by ui-builder.js; the delay is capped so long
    summaries don't keep the tail waiting. */
+.yt-timestamps-container.yt-skin-quiet .yt-gist,
 .yt-timestamps-container.yt-skin-quiet .yt-section-header,
 .yt-timestamps-container.yt-skin-quiet .yt-timestamp-item {
   animation: ytQuietIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;

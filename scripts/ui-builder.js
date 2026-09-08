@@ -621,37 +621,111 @@ function buildDetailChip() {
     return wrap;
 }
 
-// Build the static "Detail" badge for the generated-summary header: a read-only
-// pill that just reports which level produced the current summary. No popover —
-// changing the level happens in the empty state (via Reset).
+// The summary's detail control, shown on the briefing card rather than in the
+// panel header. Pressing it discloses the model and the age of the result —
+// the two things a viewer asks about a summary they did not just watch appear.
 //
 // `meta` is the request that generated the summary on screen. It matters that
-// the badge reads from there and not from storage: the stored preference is a
-// global that the user can change straight after generating, which would leave
-// the badge describing a summary that was never made at that level.
-function buildDetailBadge(meta) {
-    const wrap = document.createElement('div');
-    wrap.className = 'yt-detail-chip-wrap';
-
-    const badge = document.createElement('span');
-    badge.className = 'yt-detail-chip yt-detail-chip-static';
-    badge.title = meta?.modelId
-        ? `Detail level used for this summary (model: ${meta.modelId})`
-        : 'Detail level used for this summary';
+// this reads from there and not from storage: the stored preference is a global
+// the user can change straight after generating, which would leave the chip
+// describing a summary that was never made at that level.
+function buildBriefingDetail(meta) {
     const generated = DETAIL_OPTIONS.find((o) => o.value === meta?.length);
-    badge.textContent = (generated || DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX]).label;
-    wrap.appendChild(badge);
+    const label = (generated || DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX]).label;
 
-    // No metadata: an older cached render, or the dev harness. Fall back to the
-    // stored preference, which is the best guess available.
-    if (!generated) {
-        readPanelPrefs((prefs) => {
-            const opt = DETAIL_OPTIONS.find((o) => o.value === prefs.summaryLength);
-            if (opt) badge.textContent = opt.label;
-        });
+    const provenance = [];
+    if (meta?.modelId) provenance.push(meta.modelId);
+    if (meta?.generatedAt) provenance.push(`generated ${relativeTime(meta.generatedAt)}`);
+
+    // Nothing to disclose (an older cached render, or the dev harness): a plain
+    // read-only badge, and the stored preference as the best guess at a label.
+    if (!provenance.length) {
+        const badge = document.createElement('span');
+        badge.className = 'yt-brief-detail yt-brief-detail-static';
+        badge.textContent = label;
+        if (!generated) {
+            readPanelPrefs((prefs) => {
+                const opt = DETAIL_OPTIONS.find((o) => o.value === prefs.summaryLength);
+                if (opt) badge.textContent = opt.label;
+            });
+        }
+        return { control: badge, line: null };
     }
 
-    return wrap;
+    const line = document.createElement('div');
+    line.className = 'yt-brief-meta';
+    line.id = 'yt-brief-meta';
+    line.textContent = provenance.join(' · ');
+    line.hidden = true;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'yt-brief-detail';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', 'yt-brief-meta');
+    btn.title = 'How this summary was generated';
+
+    const text = document.createElement('span');
+    text.textContent = label;
+    const caret = document.createElement('span');
+    caret.className = 'yt-brief-caret';
+    caret.innerHTML = '<svg width="8" height="5" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.appendChild(text);
+    btn.appendChild(caret);
+
+    btn.addEventListener('click', () => {
+        const open = line.hidden;
+        line.hidden = !open;
+        btn.classList.toggle('yt-open', open);
+        btn.setAttribute('aria-expanded', String(open));
+    });
+
+    return { control: btn, line };
+}
+
+// "4 min ago" / "2 hours ago" / "3 days ago" — how old the summary on screen is.
+function relativeTime(timestamp) {
+    const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    if (seconds < 90) return 'just now';
+    const units = [
+        { limit: 3600, size: 60, name: 'min', plural: false },
+        { limit: 86400, size: 3600, name: 'hour', plural: true },
+        { limit: 2592000, size: 86400, name: 'day', plural: true }
+    ];
+    for (const unit of units) {
+        if (seconds < unit.limit) {
+            const value = Math.round(seconds / unit.size);
+            const suffix = unit.plural && value !== 1 ? 's' : '';
+            return `${value} ${unit.name}${suffix} ago`;
+        }
+    }
+    return new Date(timestamp).toLocaleDateString();
+}
+
+// The video's own length, for the briefing rail. The player is the accurate
+// source and is right there; the request's duration (taken from the last
+// transcript cue) covers a restore that renders before the player is ready.
+function videoRuntimeLabel(meta) {
+    const video = document.querySelector('video');
+    let seconds = (video && Number.isFinite(video.duration) && video.duration > 0) ? video.duration : null;
+    if (!seconds && typeof meta?.durationMinutes === 'number' && meta.durationMinutes > 0) {
+        seconds = meta.durationMinutes * 60;
+    }
+    if (!seconds) return null;
+    const whole = Math.round(seconds);
+    const hours = Math.floor(whole / 3600);
+    const minutes = Math.floor(whole / 60) % 60;
+    const secs = String(whole % 60).padStart(2, '0');
+    return hours
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}`
+        : `${minutes}:${secs}`;
+}
+
+// Minutes to read the summary, at the same 200 wpm the background uses to
+// estimate time saved — so the two numbers can never disagree.
+function readingMinutes(summaryText) {
+    const words = String(summaryText || '').trim().split(/\s+/).filter(Boolean).length;
+    return words ? Math.max(1, Math.round(words / 200)) : null;
 }
 
 // Gear (settings) icon markup, shared by the empty-state header.
@@ -715,7 +789,7 @@ function renderEmptyState(container) {
                 <div class="yt-ghost-row"><span class="yt-ghost-chip"></span><span class="yt-ghost-bar" style="width: 76%"></span></div>
                 <div class="yt-ghost-row"><span class="yt-ghost-chip"></span><span class="yt-ghost-bar" style="width: 58%"></span></div>
             </div>
-            <div class="yt-empty-text">Chapters with AI summaries, linked to the video</div>
+            <div class="yt-empty-text">An overview, then chapters linked to the video</div>
         `;
     } else {
         emptyState.innerHTML = `
@@ -1028,7 +1102,7 @@ function setGenerateButtonMode(genBtn) {
             genBtn.classList.remove('yt-needs-keys');
             genBtn.onclick = runAnalysis;
             if (emptyText) emptyText.textContent = _skinPref === 'quiet'
-                ? 'Chapters with AI summaries, linked to the video'
+                ? 'An overview, then chapters linked to the video'
                 : 'Generate an AI-powered summary with timestamps';
         } else {
             genBtn.textContent = 'Set API keys';
@@ -1150,30 +1224,39 @@ function buildDiagnostics(error) {
     return lines.join('\n');
 }
 
-function copyDiagnostics(btn) {
-    const text = buildDiagnostics(_lastError || { code: 'unknown' });
-    const confirm = () => {
-        btn.textContent = 'Copied';
-        setTimeout(() => { btn.textContent = 'Copy details'; }, 1600);
-    };
+// Put text on the clipboard. clipboard.writeText needs a focused document and a
+// secure context and neither is guaranteed inside YouTube's page, so the hidden
+// textarea stays as the fallback.
+function writeClipboardText(text) {
     const fallback = () => {
-        // clipboard.writeText needs a focused document and a secure context;
-        // neither is guaranteed inside YouTube's page, so keep the old path.
         const area = document.createElement('textarea');
         area.value = text;
         area.setAttribute('readonly', '');
         area.style.cssText = 'position:fixed;top:-1000px;opacity:0';
         document.body.appendChild(area);
         area.select();
-        try { document.execCommand('copy'); confirm(); }
-        catch { btn.textContent = 'Copy failed'; setTimeout(() => { btn.textContent = 'Copy details'; }, 1600); }
+        let copied = false;
+        try { copied = document.execCommand('copy'); } catch { copied = false; }
         area.remove();
+        return copied ? Promise.resolve() : Promise.reject(new Error('Copy command refused'));
     };
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text).then(confirm).catch(fallback);
-    } else {
-        fallback();
+        return navigator.clipboard.writeText(text).catch(fallback);
     }
+    return fallback();
+}
+
+// Swap a text button's label to say what happened, then put it back.
+function reportCopy(btn, label, done) {
+    btn.textContent = done ? 'Copied' : 'Copy failed';
+    setTimeout(() => { btn.textContent = label; }, 1600);
+}
+
+function copyDiagnostics(btn) {
+    const text = buildDiagnostics(_lastError || { code: 'unknown' });
+    writeClipboardText(text)
+        .then(() => reportCopy(btn, 'Copy details', true))
+        .catch(() => reportCopy(btn, 'Copy details', false));
 }
 
 // Remove the status block and put the Generate button back in charge.
@@ -1344,6 +1427,157 @@ function attachTitleTooltip(titleEl) {
     titleEl.addEventListener('mouseleave', hide);
 }
 
+// Split a summary into its overview line and the chapter lines below it.
+//
+// The overview travels inside the summary text (see summary-validator.js), so
+// every path that already carries a summary — the render message, the per-video
+// cache, a restore after a miniplayer toggle — carries the gist with it and
+// needs no second field. A summary without one is the normal older case and
+// simply renders as it always did.
+function splitOverview(summaryText) {
+    const overview = [];
+    const body = [];
+    for (const line of String(summaryText || '').split('\n')) {
+        const clean = line.replace(/`+/g, '').trim().replace(/^[-*•]\s+/, '').replace(/\*\*/g, '').trim();
+        if (!clean) continue;
+        const gist = /^>+\s*(.+)$/.exec(clean);
+        if (gist) { overview.push(gist[1].trim()); continue; }
+        body.push(clean);
+    }
+    return { overview: overview.join(' ').trim() || null, lines: body };
+}
+
+// The briefing card: what this summary is, before the chapter list starts.
+//
+// The audit asked for "the gist in the first glance" without settling what a
+// glance is, so this is where those decisions live:
+//  - The card is the one raised surface in the panel — a fill and a hairline,
+//    no shadow, which inside a 402px column would read as a modal. It says
+//    "this block is about the summary", not "this is the first row".
+//  - Collapsed is three lines of overview. The card's own padding costs height,
+//    and the third line buys most of it back.
+//  - The rail carries only figures the extension already has: the video's
+//    length, the points that survived validation, and the reading time at the
+//    same 200 wpm the background uses. Together they are the whole proposition
+//    — 72 minutes of video, 3 minutes of reading.
+//  - The detail level lives here rather than in the header, next to the numbers
+//    it explains, and discloses the model and the summary's age when pressed.
+//  - "Show more" appears only when something is actually clipped; a control
+//    that expands nothing is worse than no control (see revealGistToggle).
+//  - Copy takes the overview alone. Copying the whole summary with timestamp
+//    links is its own backlog item; this button does the small thing it says.
+//  - Expansion is not persisted. It costs one click, and a remembered
+//    expansion would make the panel a different height on every video.
+function buildBriefingCard({ overview, meta, points, summaryText }) {
+    const block = document.createElement('div');
+    block.className = 'yt-gist';
+    // Joins the Quiet skin's entrance cascade at position 0, ahead of the rows.
+    block.style.setProperty('--yt-i', 0);
+
+    const card = document.createElement('div');
+    card.className = 'yt-brief';
+
+    if (overview) {
+        const eyebrow = document.createElement('span');
+        eyebrow.className = 'yt-gist-eyebrow';
+        eyebrow.textContent = 'Overview';
+
+        // Model-generated prose: a text node, never innerHTML.
+        const body = document.createElement('p');
+        body.className = 'yt-gist-text';
+        body.id = 'yt-gist-text';
+        body.textContent = overview;
+
+        card.appendChild(eyebrow);
+        card.appendChild(body);
+    }
+
+    const rail = document.createElement('div');
+    rail.className = 'yt-brief-rail';
+    const runtime = videoRuntimeLabel(meta);
+    const minutes = readingMinutes(summaryText);
+    const stats = [
+        runtime ? [runtime, 'video'] : null,
+        points ? [String(points), points === 1 ? 'point' : 'points'] : null,
+        minutes ? [`${minutes} min`, 'read'] : null
+    ].filter(Boolean);
+    for (const [value, name] of stats) {
+        const stat = document.createElement('span');
+        stat.className = 'yt-brief-stat';
+        const strong = document.createElement('b');
+        strong.textContent = value;
+        stat.appendChild(strong);
+        stat.appendChild(document.createTextNode(` ${name}`));
+        rail.appendChild(stat);
+    }
+    if (stats.length) card.appendChild(rail);
+
+    const actions = document.createElement('div');
+    actions.className = 'yt-gist-actions';
+
+    if (overview) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'yt-gist-link yt-gist-more';
+        moreBtn.textContent = 'Show more';
+        moreBtn.setAttribute('aria-expanded', 'false');
+        moreBtn.setAttribute('aria-controls', 'yt-gist-text');
+        // Revealed after layout, once we know the text is long enough to clip.
+        moreBtn.hidden = true;
+        moreBtn.addEventListener('click', () => {
+            const expanded = card.classList.toggle('yt-gist-expanded');
+            moreBtn.textContent = expanded ? 'Show less' : 'Show more';
+            moreBtn.setAttribute('aria-expanded', String(expanded));
+        });
+
+        const separator = document.createElement('span');
+        separator.className = 'yt-gist-sep';
+        separator.textContent = '·';
+        separator.hidden = true;
+        separator.setAttribute('aria-hidden', 'true');
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'yt-gist-link yt-gist-copy';
+        copyBtn.textContent = 'Copy';
+        copyBtn.title = 'Copy the overview';
+        copyBtn.addEventListener('click', () => {
+            writeClipboardText(overview)
+                .then(() => reportCopy(copyBtn, 'Copy', true))
+                .catch(() => reportCopy(copyBtn, 'Copy', false));
+        });
+
+        actions.appendChild(moreBtn);
+        actions.appendChild(separator);
+        actions.appendChild(copyBtn);
+    } else {
+        // No overview to read: the detail control is the row's only occupant and
+        // sits where the links would have started, not pushed to the far edge.
+        actions.classList.add('yt-gist-actions-solo');
+    }
+
+    const detail = buildBriefingDetail(meta);
+    actions.appendChild(detail.control);
+    card.appendChild(actions);
+    if (detail.line) card.appendChild(detail.line);
+
+    block.appendChild(card);
+    return block;
+}
+
+// Show the expand control only for an overview that is actually being clipped.
+// A clamped paragraph reports its overflow only once it has been laid out, so
+// this runs after the panel is in the document.
+function revealGistToggle(block) {
+    const body = block?.querySelector('.yt-gist-text');
+    const moreBtn = block?.querySelector('.yt-gist-more');
+    if (!body || !moreBtn) return;
+    const clipped = body.scrollHeight - body.clientHeight > 1;
+    moreBtn.hidden = !clipped;
+    const separator = block.querySelector('.yt-gist-sep');
+    if (separator) separator.hidden = !clipped;
+}
+
 // Function to render timestamps UI from processed data
 // `meta` describes the request that produced this summary: which video, detail
 // level and model. It is what the cache key and the header badge are taken from,
@@ -1383,12 +1617,18 @@ function renderTimestampsUI(summaryText, meta) {
     headerTitle.className = 'yt-timestamps-panel-header-title';
     headerTitle.textContent = 'Timestamped Summary';
 
+    // A circular-arrows glyph promised "run it again with the same settings",
+    // which is not what this does: it discards the summary and returns to the
+    // setup state so a different Detail level can be chosen. A back-arrow and
+    // the words say that; an icon on its own never did.
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
     resetBtn.className = 'yt-reset-btn';
-    resetBtn.title = 'Start over';
-    resetBtn.setAttribute('aria-label', 'Start over');
-    resetBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    resetBtn.title = 'Discard this summary and choose a new detail level';
+    resetBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>';
+    const resetLabel = document.createElement('span');
+    resetLabel.textContent = 'Start over';
+    resetBtn.appendChild(resetLabel);
     resetBtn.addEventListener('click', (e) => {
         // Don't let the click bubble to the header (which toggles the accordion).
         e.stopPropagation();
@@ -1400,7 +1640,6 @@ function renderTimestampsUI(summaryText, meta) {
     });
 
     headerLeft.appendChild(headerTitle);
-    headerLeft.appendChild(buildDetailBadge(request));
     headerLeft.appendChild(resetBtn);
 
     const toggleIcon = document.createElement('span');
@@ -1417,23 +1656,22 @@ function renderTimestampsUI(summaryText, meta) {
     
     const timestampsList = document.createElement('div');
     timestampsList.className = 'yt-timestamps-list';
-    
-    // Process summary text
-    const lines = summaryText.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // Process summary text: the overview line first, then the chapter lines.
+    // The briefing card is built after the rows and inserted above them, because
+    // the figures on its rail describe what the rows turned out to be.
+    const { overview, lines } = splitOverview(summaryText);
     let itemCount = 0;
     // Render order index, set as a CSS custom property on each section header
     // and row. Classic ignores it; the Quiet skin uses it to stagger the
-    // entrance cascade when a summary first renders.
-    let orderIndex = 0;
+    // entrance cascade when a summary first renders. Index 0 is reserved for
+    // the briefing card, which leads the cascade.
+    let orderIndex = 1;
 
-    lines.forEach(line => {
-        // Normalize common LLM formatting drift so valid points aren't silently
-        // dropped: strip code fences/backticks, a leading list bullet, and
-        // markdown bold markers.
-        let cleanLine = line.replace(/`+/g, '').trim();
-        cleanLine = cleanLine.replace(/^[-*•]\s+/, '');
-        cleanLine = cleanLine.replace(/\*\*/g, '').trim();
-
+    lines.forEach(cleanLine => {
+        // splitOverview has already normalized the common LLM formatting drift
+        // that would otherwise drop valid points: code fences/backticks, a
+        // leading list bullet, and markdown bold markers.
         if (cleanLine.startsWith('#')) {
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'yt-section-header';
@@ -1583,9 +1821,21 @@ function renderTimestampsUI(summaryText, meta) {
         console.warn(`[yt-timestamps] No timestamp items parsed from a ${summaryText.length}-character summary.`);
     }
 
+    const briefing = buildBriefingCard({
+        overview,
+        meta: request,
+        points: itemCount,
+        summaryText
+    });
+    timestampsList.insertBefore(briefing, timestampsList.firstChild);
+
     panelContent.appendChild(timestampsList);
     panel.appendChild(panelContent);
     container.appendChild(panel);
+
+    // Needs the panel in the document: until then the overview has no layout to
+    // overflow, and the toggle would be offered for text that already fits.
+    revealGistToggle(briefing);
 
     _lastAppliedHeight = 0;
     applyPlayerHeight();
