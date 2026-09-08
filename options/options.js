@@ -332,22 +332,29 @@ document.addEventListener('DOMContentLoaded', async () => {
           setSingleOption(p.modelSelect, '', 'Loading models...');
         }
         
+        // Recovery has to cover an empty list as well as a thrown error. It
+        // used to handle only the throw, so a provider that answered with no
+        // models left the dropdown stuck and disabled on "Loading models...".
+        const restoreDefault = () => {
+          if (cachedModels.length > 0) return;   // the cache is still on screen
+          const initialVal = savedModel || p.defaultModel;
+          const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
+          setSingleOption(p.modelSelect, initialVal, initialLabel);
+          p.modelSelect.disabled = false;
+        };
+
         try {
           const freshModels = await p.client.fetchModels(apiKey);
           if (freshModels && freshModels.length > 0) {
             chrome.storage.local.set({ [cacheKey]: freshModels });
             renderSelectOptions(p, freshModels, savedModel);
+          } else {
+            console.warn(`${p.id} returned no models`);
+            restoreDefault();
           }
         } catch (e) {
           console.error(`Failed to fetch fresh models for ${p.id}`, e);
-          // If fetch fails but we had cache, we just keep the cache.
-          // If we had no cache and fetch fails, fall back to default/savedModel:
-          if (cachedModels.length === 0) {
-             const initialVal = savedModel || p.defaultModel;
-             const initialLabel = savedModel ? (savedModel === p.defaultModel ? (p.defaultModelName || savedModel) : savedModel) : (p.defaultModelName || p.defaultModel);
-             setSingleOption(p.modelSelect, initialVal, initialLabel);
-             p.modelSelect.disabled = false;
-          }
+          restoreDefault();
         }
       } else {
         p.modelSelect.disabled = false;
@@ -399,7 +406,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (targetModel) {
       p.modelSelect.value = targetModel.id;
-      if (!savedModel) {
+      // Persist whenever the resolved value differs from what is stored — not
+      // only on a first save. A saved model the provider has since dropped
+      // resolves to a fallback here; leaving storage alone meant the dropdown
+      // showed the fallback while generation kept using the retired id.
+      if (targetModel.id !== savedModel) {
         chrome.storage.local.set({ [`${p.id}_MODEL`]: targetModel.id });
       }
     }
@@ -622,13 +633,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     p.saveBtn.disabled = true;
     setBtn(p.saveBtn, SPINNER, 'Validating...');
 
+    // Validate against the model this key will actually be used with, and treat
+    // the outcomes separately. "The key is rejected", "the key works but that
+    // model doesn't", and "nothing answered" are three different problems, and
+    // reporting all of them as an invalid key sent people to regenerate a key
+    // that was never the issue.
     // Custom providers with empty key shouldn't fail validation immediately if local
-    const valid = p.isCustom && !key ? true : await p.client.validateKey(key);
-    if (!valid && !p.isCustom) {
+    const result = p.isCustom && !key
+      ? { status: 'valid' }
+      : await p.client.validateKey(key, p.modelSelect?.value || p.defaultModel);
+
+    if (!p.isCustom && result.status !== 'valid' && result.status !== 'model_unavailable') {
+      const message = result.status === 'unreachable'
+        ? `Couldn't reach ${p.name}. Check your connection and try again.`
+        : result.status === 'endpoint'
+          ? 'That URL is not a chat-completions endpoint.'
+          : 'Invalid API key';
       p.saveBtn.disabled = false;
       setBtn(p.saveBtn, SAVE_ICON, 'Save');
       updateStatus(p.status, 'invalid');
-      showToast('Invalid API key');
+      showToast(message);
       flashInvalid(p.input);
       return;
     }
@@ -638,11 +662,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const updates = { [p.storageKey]: key };
     const stored = await new Promise(resolve => chrome.storage.local.get([`${p.id}_MODEL`], resolve));
-    if (!stored[`${p.id}_MODEL`]) {
-      const defaultVal = (p.id === 'gemini') ? 'gemini-flash-lite-latest' : (p.modelSelect?.value || p.defaultModel);
-      if (defaultVal) {
-        updates[`${p.id}_MODEL`] = defaultVal;
-      }
+    let savedMessage = `${p.name} key saved`;
+
+    if (result.status === 'model_unavailable') {
+      // The key works; the model it was checked against does not. Replace the
+      // saved id with the current default so generation isn't left pointing at
+      // a model the provider has retired, and say which one failed.
+      updates[`${p.id}_MODEL`] = p.defaultModel;
+      savedMessage = `Key saved — ${result.model} is unavailable, so pick another model`;
+    } else if (!stored[`${p.id}_MODEL`]) {
+      const defaultVal = p.modelSelect?.value || p.defaultModel;
+      if (defaultVal) updates[`${p.id}_MODEL`] = defaultVal;
     }
 
     chrome.storage.local.set(updates, () => {
@@ -658,7 +688,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyKeyState(p, key);
         updateBanner();
         updateModelSelector();
-        showToast(`${p.name} key saved`);
+        showToast(savedMessage);
         chrome.runtime.sendMessage({ action: 'KEYS_CHANGED' });
         
         providerSetupModal.hidden = true;

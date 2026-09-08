@@ -183,14 +183,30 @@ export async function readPlayerCaptions(videoId) {
 // page bridge. Chrome supplies sender.tab/frameId; never accept a tab ID or URL
 // from the message. Only the resulting transcript leaves the page context.
 export async function getPlayerCaptions(request, sender) {
-  let page;
-  try { page = new URL(sender.url); } catch { return { success: false, error: 'Invalid video page.', code: 'video_changed' }; }
+  const invalid = { success: false, error: 'Invalid video page.', code: 'video_changed' };
+
+  // Who is asking: origin and frame come from `sender`, which cannot claim
+  // either of them falsely.
+  let origin;
+  try { origin = new URL(sender.url); } catch { return invalid; }
   if (!sender.tab?.id || sender.frameId !== 0 ||
-      !['https:', 'http:'].includes(page.protocol) ||
-      !(page.hostname === 'youtube.com' || page.hostname.endsWith('.youtube.com')) ||
-      page.pathname !== '/watch' || !request.videoId || page.searchParams.get('v') !== request.videoId) {
-    return { success: false, error: 'Invalid video page.', code: 'video_changed' };
+      !['https:', 'http:'].includes(origin.protocol) ||
+      !(origin.hostname === 'youtube.com' || origin.hostname.endsWith('.youtube.com')) ||
+      !request.videoId) {
+    return invalid;
   }
+
+  // Which video: asked of the browser, because `sender.url` is fixed when the
+  // content script's context is created and YouTube changes videos without
+  // creating a new one. It is also the page about to be injected into, so
+  // checking it is the stronger check as well as the accurate one.
+  let page;
+  try { page = new URL((await chrome.tabs.get(sender.tab.id)).url || ''); } catch { return invalid; }
+  if (!(page.hostname === 'youtube.com' || page.hostname.endsWith('.youtube.com')) ||
+      page.pathname !== '/watch' || page.searchParams.get('v') !== request.videoId) {
+    return invalid;
+  }
+
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId: sender.tab.id, frameIds: [0] },

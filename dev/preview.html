@@ -56,11 +56,18 @@
       onMessage: { addListener() {} },
       sendMessage: (msg, cb) => {
         if (msg && msg.action === 'START_ANALYSIS') {
-          // Simulate the real flow: progress phase, render, then success.
+          // Echo the request binding the way the background does, so the
+          // panel's own stale-message checks are exercised here too.
+          const meta = {
+            videoId: msg.videoId, requestId: msg.requestId,
+            provider: 'demo', modelId: 'demo-model-1', length: msg.length, points: 8
+          };
+          window.__lastRequest = meta;
           setTimeout(() => updateGenerateButton('calling_api'), 600);
-          setTimeout(() => renderTimestampsUI(SAMPLE_SUMMARY), 2200);
+          setTimeout(() => renderTimestampsUI(SAMPLE_SUMMARY, meta), 2200);
           setTimeout(() => cb && cb({ success: true }), 2300);
         } else if (cb) {
+          if (msg && msg.action === 'CANCEL_ANALYSIS') window.__lastCancel = msg;
           cb({ success: true });
         }
       }

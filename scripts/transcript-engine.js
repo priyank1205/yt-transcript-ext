@@ -69,32 +69,54 @@ function panelHasSegments(panel) {
                  panel.querySelector(SELECTORS.OLD.segment));
 }
 
+// The video currently in the address bar, or null off a watch page. Named for
+// the page rather than "current" because content-main.js already owns a global
+// of that name, and these scripts share one scope.
+function pageVideoId() {
+  return new URLSearchParams(window.location.search).get('v');
+}
+
+const CHANGED_ERROR = 'Video changed. Please generate the summary again.';
+const videoChanged = () => ({ success: false, error: CHANGED_ERROR, code: 'video_changed' });
+
 // Function to extract transcript from YouTube video
+//
+// `requestedVideoId` is the video the caller started its request for. Panel
+// extraction takes seconds and involves opening YouTube's own UI, so the page
+// can move on midway; every return is checked against the request rather than
+// against whatever the URL says by then, and a mismatch is refused instead of
+// answered with the wrong video's words.
+//
 // Failure codes below are the string values of ERROR_CODES in scripts/errors.js.
 // This file is a classic content script and cannot import that module, so the
 // codes travel as literals and the service worker resolves them into the
 // category the panel renders.
-async function extractTranscript() {
-  const videoId = new URLSearchParams(window.location.search).get('v');
-  const result = await extractPanelTranscript();
-  // Keep successful panel extraction exactly as before. Only missing or
-  // unreadable transcripts need the player's caption track.
+async function extractTranscript(requestedVideoId) {
+  const videoId = requestedVideoId || pageVideoId();
+  if (!videoId || (requestedVideoId && requestedVideoId !== pageVideoId())) return videoChanged();
+
+  const result = await extractPanelTranscript(videoId);
+  // Keep successful panel extraction exactly as before, but never return it for
+  // a video the page has since left: the success path used to skip this check.
+  if (pageVideoId() !== videoId) return videoChanged();
   if (result.success) return result;
-  if (new URLSearchParams(window.location.search).get('v') !== videoId) {
-    return { success: false, error: 'Video changed. Please generate the summary again.', code: 'video_changed' };
-  }
+
   try {
     const captions = await chrome.runtime.sendMessage({ action: 'GET_PLAYER_CAPTIONS', videoId });
-    if (new URLSearchParams(window.location.search).get('v') !== videoId) {
-      return { success: false, error: 'Video changed. Please generate the summary again.', code: 'video_changed' };
-    }
+    if (pageVideoId() !== videoId) return videoChanged();
     return captions || result;
   } catch (err) {
     return { success: false, error: 'Could not read captions. Please refresh the page and try again.', code: 'captions_unreadable' };
   }
 }
 
-async function extractPanelTranscript() {
+// `videoId` is the video this extraction was started for. Every wait below
+// ends early once the page has left it: an extraction that keeps running for a
+// video the user has navigated away from goes on to click YouTube's own panel
+// controls, and would close the panel the *next* extraction just opened — so
+// the abandoned run breaks the live one rather than merely wasting time.
+async function extractPanelTranscript(videoId) {
+  const abandoned = () => videoId && pageVideoId() !== videoId;
   try {
     // 1. Check if a transcript is already open and populated
     const alreadyOpen = findRenderedSegments();
@@ -109,6 +131,7 @@ async function extractPanelTranscript() {
       if (expandBtn) {
         expandBtn.click();
         await sleep(1000);
+        if (abandoned()) return videoChanged();
         transcriptBtn = findTranscriptButton();
       }
     }
@@ -118,7 +141,10 @@ async function extractPanelTranscript() {
     transcriptBtn.click();
 
     // 4. Wait for YouTube to render the segments, wherever they land.
-    const panelInfo = await waitForTranscriptSegments();
+    const panelInfo = await waitForTranscriptSegments(videoId);
+    // Leave the page alone if it has moved on: the panel on screen now belongs
+    // to whatever is extracting for the new video.
+    if (abandoned()) return videoChanged();
     if (!panelInfo) {
       // Don't leave a half-opened panel behind when extraction fails.
       logPanelDiagnostics();
@@ -140,11 +166,14 @@ async function extractPanelTranscript() {
 // Polling rather than a MutationObserver: the segments can land in any of several
 // panels depending on the variant, so there is no single node that is reliably
 // worth observing. A 250ms poll of two tag selectors is cheap and variant-proof.
-async function waitForTranscriptSegments(timeout = SEGMENT_TIMEOUT) {
+async function waitForTranscriptSegments(videoId, timeout = SEGMENT_TIMEOUT) {
   const deadline = Date.now() + timeout;
   let previousCount = 0;
 
   while (Date.now() < deadline) {
+    // Stop the moment the page leaves the video this wait belongs to, rather
+    // than polling on for the rest of the twenty seconds.
+    if (videoId && pageVideoId() !== videoId) return null;
     const found = findRenderedSegments();
     if (found) {
       // Return only once the count stops growing, so a transcript that renders

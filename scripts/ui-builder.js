@@ -92,7 +92,7 @@ function setPanelSkinPref(pref) {
     if (genBtn && genBtn.disabled) return;
     const cached = getCachedSummary(getCurrentVideoId());
     if (container.classList.contains('yt-has-summary') && cached) {
-        renderTimestampsUI(cached);
+        renderTimestampsUI(cached.text, cached.meta);
     } else if (!container.classList.contains('yt-has-summary')) {
         renderEmptyState(container);
     }
@@ -114,14 +114,17 @@ function getCurrentVideoId() {
     return new URLSearchParams(window.location.search).get('v');
 }
 
-function cacheSummary(videoId, summaryText) {
+// Entries keep the request metadata that produced them (video, detail level,
+// model), so a restore renders the summary the way it was generated instead of
+// re-reading whatever the global settings happen to say now.
+function cacheSummary(videoId, summaryText, meta) {
     if (videoId && summaryText) {
-        _summaryCache[videoId] = summaryText;
+        _summaryCache[videoId] = { text: summaryText, meta: meta || null };
     }
 }
 
 function getCachedSummary(videoId) {
-    return videoId ? _summaryCache[videoId] : null;
+    return videoId ? _summaryCache[videoId] || null : null;
 }
 
 function clearSummaryCache(videoId) {
@@ -562,20 +565,32 @@ function buildDetailChip() {
 // Build the static "Detail" badge for the generated-summary header: a read-only
 // pill that just reports which level produced the current summary. No popover —
 // changing the level happens in the empty state (via Reset).
-function buildDetailBadge() {
+//
+// `meta` is the request that generated the summary on screen. It matters that
+// the badge reads from there and not from storage: the stored preference is a
+// global that the user can change straight after generating, which would leave
+// the badge describing a summary that was never made at that level.
+function buildDetailBadge(meta) {
     const wrap = document.createElement('div');
     wrap.className = 'yt-detail-chip-wrap';
 
     const badge = document.createElement('span');
     badge.className = 'yt-detail-chip yt-detail-chip-static';
-    badge.title = 'Detail level used for this summary';
-    badge.textContent = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].label;
+    badge.title = meta?.modelId
+        ? `Detail level used for this summary (model: ${meta.modelId})`
+        : 'Detail level used for this summary';
+    const generated = DETAIL_OPTIONS.find((o) => o.value === meta?.length);
+    badge.textContent = (generated || DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX]).label;
     wrap.appendChild(badge);
 
-    chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
-        const opt = DETAIL_OPTIONS.find((o) => o.value === res.SUMMARY_LENGTH);
-        if (opt) badge.textContent = opt.label;
-    });
+    // No metadata: an older cached render, or the dev harness. Fall back to the
+    // stored preference, which is the best guess available.
+    if (!generated) {
+        chrome.storage.local.get(['SUMMARY_LENGTH'], (res) => {
+            const opt = DETAIL_OPTIONS.find((o) => o.value === res.SUMMARY_LENGTH);
+            if (opt) badge.textContent = opt.label;
+        });
+    }
 
     return wrap;
 }
@@ -739,7 +754,7 @@ function injectSidebar(secondary) {
     // Restore cached summary if available (e.g. after miniplayer toggle)
     const cachedSummary = getCachedSummary(getCurrentVideoId());
     if (cachedSummary) {
-        renderTimestampsUI(cachedSummary);
+        renderTimestampsUI(cachedSummary.text, cachedSummary.meta);
     }
 }
 
@@ -798,34 +813,110 @@ function showSettingsHint(panel, gearIcon) {
     host.appendChild(hint);
 }
 
+// --- Request ownership -------------------------------------------------------
+//
+// A generation is bound to the video it was started on and to an id of its own.
+// Everything the background sends back carries that binding, and the panel acts
+// only on messages that match: a summary produced for the previous video, or by
+// a run this panel has already given up on, is dropped rather than rendered
+// over whatever is on screen now.
+let _activeRequest = null;
+
+function newRequestId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return `r${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// A message with no id predates the binding (the dev harness sends these), so it
+// is allowed through; one that names a generation this panel isn't waiting for
+// is not.
+function isStaleRequest(requestId) {
+    if (!requestId) return false;
+    return !_activeRequest || _activeRequest.id !== requestId;
+}
+
+// Does this message belong to what the panel is showing and waiting for?
+function isCurrentGeneration(message) {
+    if (!message) return false;
+    if (message.videoId && message.videoId !== getCurrentVideoId()) return false;
+    return !isStaleRequest(message.requestId);
+}
+
+// Tell the background to stop the generation this panel started. Used by the UI
+// timeout and by navigating away — without it, the panel's own timeout left the
+// provider call running, free to overlap the next attempt.
+function cancelActiveRequest(reason) {
+    if (!_activeRequest) return;
+    const { id, videoId } = _activeRequest;
+    _activeRequest = null;
+    try {
+        chrome.runtime.sendMessage({ action: 'CANCEL_ANALYSIS', requestId: id, videoId, reason }, () => {
+            void chrome.runtime.lastError;   // the worker may already be gone
+        });
+    } catch { /* extension context invalidated */ }
+}
+
+// Set while a generation is in flight: re-arms that run's idle timeout. The
+// progress handler calls it, which is what lets a multi-part summary of a long
+// video take as long as it honestly needs.
+let _noteAnalysisProgress = null;
+
+function noteAnalysisProgress() {
+    if (typeof _noteAnalysisProgress === 'function') _noteAnalysisProgress();
+}
+
 // Run the transcript -> summary analysis flow (used when at least one API key is set)
 function runAnalysis() {
+    // One generation at a time: a second click, or a Try again racing a slow
+    // response, must not start work whose result would arrive out of order.
+    if (_activeRequest) return;
+
+    const request = { id: newRequestId(), videoId: getCurrentVideoId() };
+    _activeRequest = request;
     updateGenerateButton('extracting');
 
     // Send analysis request with timeout. Model is a global preference (settings
     // page); length is the "Detail" preset currently selected in the panel chip.
-    const sendAnalysis = (model, length, timeout = 120000) => {
+    //
+    // The timeout measures silence, not total time. A long video is summarised
+    // in parts, and the whole run legitimately outlasts any single-call budget —
+    // but each finished part reports progress, so re-arming the timer on every
+    // update still catches a genuinely stuck provider without cutting off a run
+    // that is visibly working.
+    const sendAnalysis = (model, length, idleTimeout = 120000) => {
         return new Promise((resolve) => {
             let resolved = false;
+            let timer = null;
 
-            const timer = setTimeout(() => {
-                if (!resolved) {
+            const arm = () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    if (resolved) return;
                     resolved = true;
+                    _noteAnalysisProgress = null;
+                    // Stop the provider call too, not just the waiting.
+                    cancelActiveRequest('timeout');
                     resolve({ success: false, error: LOCAL_ERRORS.timeout });
-                }
-            }, timeout);
+                }, idleTimeout);
+            };
+            arm();
+            _noteAnalysisProgress = arm;
 
-            chrome.runtime.sendMessage({ action: "START_ANALYSIS", model: model, length: length }, (res) => {
-                if (!resolved) {
-                    resolved = true;
-                    clearTimeout(timer);
-                    if (chrome.runtime.lastError) {
-                        resolve({ success: false, error: LOCAL_ERRORS.disconnected });
-                    } else {
-                        resolve(res || { success: false, error: LOCAL_ERRORS.disconnected });
-                    }
-                } else {
+            chrome.runtime.sendMessage({
+                action: "START_ANALYSIS",
+                model: model,
+                length: length,
+                videoId: request.videoId,
+                requestId: request.id
+            }, (res) => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
+                _noteAnalysisProgress = null;
+                if (chrome.runtime.lastError) {
                     resolve({ success: false, error: LOCAL_ERRORS.disconnected });
+                } else {
+                    resolve(res || { success: false, error: LOCAL_ERRORS.disconnected });
                 }
             });
         });
@@ -841,10 +932,18 @@ function runAnalysis() {
             // Use the level selected in the chip; fall back to the stored default.
             const length = _pendingDetail || prefs.SUMMARY_LENGTH || 'standard';
             // Generating commits this level as the new sticky default, so the next
-            // video (and this summary's header badge) opens on it.
+            // video opens on it. The summary's own badge reads the request, not this.
             chrome.storage.local.set({ SUMMARY_LENGTH: length });
 
             const result = await sendAnalysis(model, length);
+
+            // Another generation took ownership while this one was in flight:
+            // its outcome is no longer this panel's to report.
+            if (_activeRequest && _activeRequest.id !== request.id) return;
+            if (_activeRequest === request) _activeRequest = null;
+
+            // A cancelled run is an expected outcome, not a failure to show.
+            if (result?.cancelled) return;
 
             if (result && result.success) {
                 updateGenerateButton('done');
@@ -852,9 +951,19 @@ function runAnalysis() {
                 updateGenerateButton('error', result?.error);
             }
         } catch (e) {
+            if (_activeRequest === request) _activeRequest = null;
             updateGenerateButton('error', LOCAL_ERRORS.disconnected);
         }
     })();
+}
+
+// Is any provider configured well enough to generate? A custom provider pointing
+// at a local endpoint is saved with an empty key on purpose, so "has a non-empty
+// key" is the wrong question — asking it rejected a perfectly usable local setup.
+function hasUsableProvider(res) {
+    if (Object.keys(res).some(key => key.endsWith('_API_KEY') && !!res[key])) return true;
+    const custom = Array.isArray(res.CUSTOM_PROVIDERS) ? res.CUSTOM_PROVIDERS : [];
+    return custom.some(cp => cp?.storageKey && typeof res[cp.storageKey] === 'string');
 }
 
 // Toggle the primary button between generating a summary and prompting for API keys.
@@ -862,7 +971,7 @@ function runAnalysis() {
 function setGenerateButtonMode(genBtn) {
     if (!genBtn) return;
     chrome.storage.local.get(null, (res) => {
-        const hasKey = Object.keys(res).some(key => key.endsWith('_API_KEY') && !!res[key]);
+        const hasKey = hasUsableProvider(res);
         const emptyText = document.querySelector('.yt-empty-text');
         if (hasKey) {
             genBtn.textContent = 'Generate summary';
@@ -1063,6 +1172,9 @@ function renderErrorBlock(error) {
     actions.className = 'yt-error-actions';
     actions.appendChild(makeErrorAction('Try again', 'yt-error-primary', () => {
         clearErrorBlock();
+        // The failed generation no longer owns the panel, so a retry is free to
+        // claim it. Without this the one-at-a-time guard would swallow the click.
+        _activeRequest = null;
         runAnalysis();
     }));
     if (error.settings) {
@@ -1124,7 +1236,10 @@ function updateGenerateButton(phase, payload) {
             break;
         case 'calling_api':
             genBtn.disabled = true;
-            setGenerateButtonLabel(genBtn, 'Generating summary...', true);
+            // A windowed run names the part it is on: without it a five-hour
+            // video looks hung for minutes behind an unchanging label.
+            setGenerateButtonLabel(genBtn,
+                typeof payload === 'string' && payload ? payload : 'Generating summary...', true);
             if (panel) panel.classList.add('yt-generating');
             break;
         case 'done':
@@ -1180,9 +1295,13 @@ function attachTitleTooltip(titleEl) {
 }
 
 // Function to render timestamps UI from processed data
-function renderTimestampsUI(summaryText) {
+// `meta` describes the request that produced this summary: which video, detail
+// level and model. It is what the cache key and the header badge are taken from,
+// instead of from the URL and the global settings at render time.
+function renderTimestampsUI(summaryText, meta) {
+    const request = meta || null;
     // Cache the summary for restoration across DOM rebuilds (e.g. miniplayer toggle)
-    cacheSummary(getCurrentVideoId(), summaryText);
+    cacheSummary(request?.videoId || getCurrentVideoId(), summaryText, request);
 
     // This function will build the UI for timestamps
     const container = document.querySelector('.yt-timestamps-container');
@@ -1226,11 +1345,12 @@ function renderTimestampsUI(summaryText) {
         // Clear the cached summary so no re-inject restores it, then rebuild the
         // empty state (the Detail slider re-syncs to the stored SUMMARY_LENGTH).
         clearSummaryCache(getCurrentVideoId());
+        _activeRequest = null;
         renderEmptyState(container);
     });
 
     headerLeft.appendChild(headerTitle);
-    headerLeft.appendChild(buildDetailBadge());
+    headerLeft.appendChild(buildDetailBadge(request));
     headerLeft.appendChild(resetBtn);
 
     const toggleIcon = document.createElement('span');
@@ -1439,6 +1559,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     injectSidebar,
     renderTimestampsUI,
-    updateGenerateButton
+    updateGenerateButton,
+    noteAnalysisProgress
   };
 }

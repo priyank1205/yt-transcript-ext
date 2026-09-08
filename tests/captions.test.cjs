@@ -152,27 +152,56 @@ test('network timeout aborts requests and returns a retryable failure', async ()
   assert.equal((await env.read()).success, false);
 });
 
-test('service worker injects only into the requesting YouTube main frame', async () => {
+function captionsEnv(tabUrl = `https://www.youtube.com/watch?v=${id}`) {
   const env = setup();
-  let injection;
-  env.context.chrome = { scripting: { executeScript: async spec => {
-    injection = spec;
-    return [{ result: { success: true, data: '[0:01] Hello\n' } }];
-  } } };
+  env.injection = null;
+  env.context.chrome = {
+    scripting: { executeScript: async spec => {
+      env.injection = spec;
+      return [{ result: { success: true, data: '[0:01] Hello\n' } }];
+    } },
+    tabs: { get: async tabId => {
+      if (tabId !== 42) throw new Error('No tab with that id');
+      return { id: 42, url: tabUrl };
+    } }
+  };
+  return env;
+}
+
+test('service worker injects only into the requesting YouTube main frame', async () => {
+  const env = captionsEnv();
   const sender = { tab: { id: 42 }, frameId: 0, url: `https://www.youtube.com/watch?v=${id}` };
   assert.equal((await env.context.getPlayerCaptions({ videoId: id, tabId: 999 }, sender)).success, true);
-  assert.equal(injection.target.tabId, 42);
-  assert.equal(injection.world, 'MAIN');
-  assert.equal(injection.args[0], id);
+  assert.equal(env.injection.target.tabId, 42);
+  assert.equal(env.injection.world, 'MAIN');
+  assert.equal(env.injection.args[0], id);
   for (const invalid of [
     { ...sender, frameId: 1 }, { ...sender, tab: undefined },
     { ...sender, url: `https://youtube.com.evil.test/watch?v=${id}` },
-    { ...sender, url: 'https://www.youtube.com/watch?v=other' }
+    { ...sender, tab: { id: 7 } }
   ]) {
-    injection = null;
+    env.injection = null;
     assert.equal((await env.context.getPlayerCaptions({ videoId: id }, invalid)).success, false);
-    assert.equal(injection, null);
+    assert.equal(env.injection, null);
   }
+});
+
+test('the tab decides which video is current, not the message sender', async () => {
+  // YouTube changes videos in the page, so sender.url still names the video the
+  // tab was opened on. The request must be judged against the tab's real URL:
+  // trusting sender.url refused every generation after an in-page navigation.
+  const arrivedOn = { tab: { id: 42 }, frameId: 0, url: 'https://www.youtube.com/watch?v=arrived-on' };
+  const current = captionsEnv();
+  assert.equal((await current.context.getPlayerCaptions({ videoId: id }, arrivedOn)).success, true);
+  assert.equal(current.injection.args[0], id);
+
+  const movedOn = captionsEnv('https://www.youtube.com/watch?v=somewhere-else');
+  assert.equal((await movedOn.context.getPlayerCaptions({ videoId: id }, arrivedOn)).code, 'video_changed');
+  assert.equal(movedOn.injection, null);
+
+  const offWatch = captionsEnv('https://www.youtube.com/feed/subscriptions');
+  assert.equal((await offWatch.context.getPlayerCaptions({ videoId: id }, arrivedOn)).code, 'video_changed');
+  assert.equal(offWatch.injection, null);
 });
 
 function engine() {
@@ -227,6 +256,22 @@ test('a panel that opens but never populates is closed before caption fallback',
   env.chrome.runtime.sendMessage = async () => { actions.push('captions'); return { success: true, data: 'captions' }; };
   assert.equal((await env.extractTranscript()).success, true);
   assert.deepEqual(actions, ['open', 'close', 'captions']);
+});
+
+test('an extraction the page has moved on from stops without touching the panel', async () => {
+  // Clicking through to another video mid-extraction leaves this run orphaned.
+  // It must not go on to close the panel, because by then the panel on screen
+  // is the one the *new* video's extraction just opened.
+  const env = engine();
+  const actions = [];
+  env.findTranscriptButton = () => ({ click: () => {
+    actions.push('open');
+    env.window.location.search = '?v=next';
+  } });
+  env.closeTranscriptPanel = () => actions.push('close');
+  env.chrome.runtime.sendMessage = async () => { actions.push('captions'); return { success: true, data: 'captions' }; };
+  assert.match((await env.extractTranscript(id)).error, /Video changed/);
+  assert.deepEqual(actions, ['open']);
 });
 
 test('navigation during fallback discards data before it reaches the summarizer', async () => {

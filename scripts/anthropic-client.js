@@ -1,7 +1,7 @@
 // scripts/anthropic-client.js
 
 import { LLMClient } from './llm-client.js';
-import CONSTANTS, { composeSummaryPrompt } from './constants.js';
+import CONSTANTS, { composeSummaryPrompt, outputBudgetFor } from './constants.js';
 import { apiError, codeForStatus, ERROR_CODES } from './errors.js';
 
 class AnthropicClient extends LLMClient {
@@ -9,7 +9,7 @@ class AnthropicClient extends LLMClient {
     super();
     this.providerConfig = providerConfig;
     this.endpoint = providerConfig?.endpoint || 'https://api.anthropic.com/v1/messages';
-    this.modelId = providerConfig?.defaultModel || 'claude-3-5-haiku-latest';
+    this.modelId = providerConfig?.defaultModel || 'claude-haiku-4-5-20251001';
   }
 
   async callAPI(apiKey, transcript, options = {}) {
@@ -27,9 +27,15 @@ Here is the transcript: ${transcript}`;
         "anthropic-version": "2023-06-01",
         "anthropic-dangerously-allow-browser": "true"
       },
+      // Carries the caller's cancellation: navigating away or superseding the
+      // request stops the call instead of leaving it running to completion.
+      signal: options.signal,
       body: JSON.stringify({
         model: selectedModel,
-        max_tokens: 8000,
+        // Sized from the density this run asked for: an In-depth summary of a
+        // long video needs far more room than a brief one, and a reply cut off
+        // mid-list is thrown away by the validator.
+        max_tokens: outputBudgetFor(options),
         temperature: 0.3,
         messages: [
           {
@@ -53,14 +59,21 @@ Here is the transcript: ${transcript}`;
       throw apiError(codeForStatus(status), errorMsg, status);
     }
     
-    if (result.content && result.content.length > 0 && result.content[0].text) {
-      return result.content[0].text;
-    } else {
-      throw apiError(ERROR_CODES.BAD_OUTPUT, `Failed to get response from ${this.getModelName()}.`, response.status);
+    const text = result.content?.find?.(part => part?.type === 'text')?.text ||
+      (result.content?.length > 0 ? result.content[0].text : '');
+    if (text) {
+      // `stop_reason` is how a summary that ran out of output budget announces
+      // itself; passing it on is what stops a half-written list looking fine.
+      return { text, finishReason: result.stop_reason || null };
     }
+    if (result.stop_reason) return { text: '', finishReason: result.stop_reason };
+    throw apiError(ERROR_CODES.BAD_OUTPUT, `Failed to get response from ${this.getModelName()}.`, response.status);
   }
 
-  async validateKey(apiKey) {
+  // Separates "this key is rejected" from "this key can't use that model", so a
+  // model that has been retired since it was saved never reads as a bad key.
+  async validateKey(apiKey, modelId) {
+    const model = modelId || this.modelId;
     try {
       const res = await fetch(this.endpoint, {
         method: "POST",
@@ -71,37 +84,51 @@ Here is the transcript: ${transcript}`;
           "anthropic-dangerously-allow-browser": "true"
         },
         body: JSON.stringify({
-          model: this.modelId,
+          model,
           messages: [{ role: "user", content: "." }],
           max_tokens: 1
         })
       });
-      return res.ok;
+      if (res.ok) return { status: 'valid', model };
+      if (res.status === 401 || res.status === 403) return { status: 'invalid', model };
+      if (res.status === 404) return { status: 'model_unavailable', model };
+      // A 400 naming the model is Anthropic's answer for a retired id; any
+      // other 400 is a malformed request, which the key is not to blame for.
+      if (res.status === 400) {
+        const body = await res.json().catch(() => ({}));
+        const message = String(body?.error?.message || '').toLowerCase();
+        return { status: message.includes('model') ? 'model_unavailable' : 'invalid', model };
+      }
+      return { status: 'unreachable', model };
     } catch {
-      return false;
+      return { status: 'unreachable', model };
     }
   }
 
+  // Throws when the list could not be read, so an empty array always means
+  // "this key really has no usable models" and callers can tell them apart.
   async fetchModels(apiKey) {
+    let res;
     try {
-      const res = await fetch('https://api.anthropic.com/v1/models', {
+      res = await fetch('https://api.anthropic.com/v1/models', {
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
           "anthropic-dangerously-allow-browser": "true"
         }
       });
-      if (!res.ok) return [];
-      const data = await res.json();
-      if (!data.data || !Array.isArray(data.data)) return [];
-      
-      return data.data.map(m => ({
-        id: m.id,
-        name: m.display_name || m.id
-      }));
-    } catch {
-      return [];
+    } catch (err) {
+      throw apiError(ERROR_CODES.NETWORK, `Could not reach Anthropic to list models: ${err.message}`);
     }
+    if (!res.ok) throw apiError(codeForStatus(res.status), `Anthropic model list failed (${res.status}).`, res.status);
+    const data = await res.json().catch(() => ({}));
+    if (!Array.isArray(data.data)) return [];
+
+    // /v1/models lists text models only, so there is nothing to filter out.
+    return data.data.map(m => ({
+      id: m.id,
+      name: m.display_name || m.id
+    }));
   }
 
   getModelName() {

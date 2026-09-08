@@ -23,7 +23,10 @@ export const ERROR_CODES = {
   NETWORK: 'network',
   TIMEOUT: 'timeout',
   BAD_OUTPUT: 'bad_output',
+  TRUNCATED: 'truncated',
+  BLOCKED: 'blocked',
   PROVIDER_DOWN: 'provider_down',
+  BUSY: 'busy',
   UNKNOWN: 'unknown'
 };
 
@@ -84,9 +87,23 @@ const CATEGORIES = {
     detail: 'The model returned something this panel could not parse. Try again, or switch models.',
     settings: true
   },
+  [ERROR_CODES.TRUNCATED]: {
+    title: 'The summary was cut off',
+    detail: 'The model reached its output limit before finishing. Try the Brief detail level, or a model with a larger output budget.',
+    settings: true
+  },
+  [ERROR_CODES.BLOCKED]: {
+    title: 'The provider blocked this response',
+    detail: 'The model declined to summarize this transcript. Try another provider or model.',
+    settings: true
+  },
   [ERROR_CODES.PROVIDER_DOWN]: {
     title: 'The provider is unavailable',
     detail: 'The service reported an error on its side. Try again shortly.'
+  },
+  [ERROR_CODES.BUSY]: {
+    title: 'A summary is already being generated',
+    detail: 'Wait for the current one to finish, or reload the page to start over.'
   },
   [ERROR_CODES.UNKNOWN]: {
     title: 'Something went wrong',
@@ -129,6 +146,7 @@ function codeFromMessage(message) {
   if (text.includes('timed out') || text.includes('timeout')) return ERROR_CODES.TIMEOUT;
   if (text.includes('failed to fetch') || text.includes('network')) return ERROR_CODES.NETWORK;
   if (text.includes('too long') || text.includes('too large') || text.includes('context length')) return ERROR_CODES.INPUT_TOO_LARGE;
+  if (text.includes('cut off') || text.includes('truncated')) return ERROR_CODES.TRUNCATED;
   if (text.includes('unavailable')) return ERROR_CODES.PROVIDER_DOWN;
   return ERROR_CODES.UNKNOWN;
 }
