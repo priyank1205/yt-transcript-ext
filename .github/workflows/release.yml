@@ -41,7 +41,21 @@ jobs:
           npm run check
           npm run package
 
-          cat > /tmp/notes.md <<'NOTES'
+          # Notes come from this version's CHANGELOG section. Without one, fall
+          # back to notes generated from the commits, so a missing entry delays
+          # nothing — it only makes the release read less well.
+          if node tools/changelog-notes.mjs "$VERSION" > /tmp/notes.md; then
+            echo "Using the CHANGELOG entry for $VERSION."
+          else
+            echo "No CHANGELOG entry for $VERSION; generating notes from commits."
+            gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$TAG" \
+              -f target_commitish="$GITHUB_SHA" \
+              --jq .body > /tmp/notes.md
+          fi
+
+          cat >> /tmp/notes.md <<'NOTES'
+
           ### Install
 
           1. Download the `.zip` below and unzip it.

@@ -13,7 +13,8 @@
     "test:manifest": "node tools/check-manifest.mjs",
     "test:browser": "node tests/serve-browser-tests.cjs",
     "check": "npm run test:manifest && npm test",
-    "package": "bash tools/package.sh"
+    "package": "bash tools/package.sh",
+    "bump": "node tools/bump-version.mjs"
   },
   "engines": {
     "node": ">=20"

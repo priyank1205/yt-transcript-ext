@@ -52,7 +52,8 @@ and attaches it to the run.
 | `styles/` | `content.css` (Classic) and `skin-quiet.css` (Quiet) |
 | `tests/` | `node:test` suites plus the browser harness |
 | `dev/preview.html` | Panel harness with stubbed `chrome.*` APIs |
-| `tools/` | Manifest check and release packaging |
+| `CHANGELOG.md` | What changed per version; the source of release notes |
+| `tools/` | Manifest check, version bump, changelog notes, release packaging |
 
 Two boundaries worth keeping:
 
@@ -75,13 +76,19 @@ Releases are published automatically. Pushing to `main` with a version that
 has no release yet publishes it with the zip attached; pushing to `main`
 without changing the version does nothing.
 
-1. Bump `version` in `manifest.json` and `package.json` (the check requires
-   they agree).
-2. Push to `main`.
+1. Write what changed under **Unreleased** in `CHANGELOG.md` as you work.
+2. `npm run bump -- patch` (or `minor` / `major`, or an explicit version). This
+   raises the version in both `manifest.json` and `package.json` — which the
+   check requires to agree — and moves the Unreleased notes under the new
+   version's heading.
+3. Commit and push to `main`.
 
 The workflow re-runs the checks, builds the zip, tags the commit `v<version>`
-and publishes the release. To build the same zip locally without releasing
-anything, run `npm run package`.
+and publishes the release, using that version's CHANGELOG section as the
+release notes. A version with no CHANGELOG entry still releases; its notes are
+generated from commit messages instead.
+
+To build the same zip locally without releasing anything, run `npm run package`.
 
 ## Filing issues
 
