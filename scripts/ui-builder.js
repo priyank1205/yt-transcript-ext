@@ -104,7 +104,7 @@ function applyPanelPrefs(prefs) {
 // the container when the resolved theme is light. Resolution: an explicit
 // 'light'/'dark' override wins; 'system' (default) follows YouTube's own theme,
 // which YouTube signals via the `dark` attribute on <html>.
-let _themePref = 'system';
+let _themePref = PANEL_PREF_DEFAULTS.theme;
 let _ytThemeObserver = null;
 
 function getYouTubeTheme() {
@@ -129,7 +129,7 @@ function setPanelThemePref(pref) {
 // is opt-in via the PANEL_SKIN preference while it's being evaluated. 'classic'
 // (no class) stays the shipping default; 'quiet' adds `yt-skin-quiet` to the
 // container, which the skin stylesheet scopes every override under.
-let _skinPref = 'classic';
+let _skinPref = PANEL_PREF_DEFAULTS.skin;
 
 function applyPanelSkin(pref, containerEl) {
     const container = containerEl || document.querySelector('.yt-timestamps-container');
@@ -158,6 +158,36 @@ function setPanelSkinPref(pref) {
         renderEmptyState(container);
     }
 }
+
+// Reading the preferences costs a round trip to the background, and nothing
+// about that is fast enough for a first paint. The panel used to mount with the
+// module defaults, then correct itself once the answer arrived — which is the
+// visible Classic-then-Quiet swap on every page load and reload. So the read is
+// started the moment this script runs, long before YouTube's sidebar exists to
+// mount into, and the first mount waits on it (see injectSidebar).
+//
+// The wait is bounded: a service worker that is slow to wake, or gone entirely,
+// must cost the panel a late paint rather than no panel at all.
+const PREFS_PRIME_TIMEOUT_MS = 1000;
+let _prefsPrimed = false;
+let _primePromise = null;
+
+function primePanelPrefs() {
+    if (!_primePromise) {
+        _primePromise = new Promise((resolve) => {
+            readPanelPrefs((prefs) => {
+                _themePref = prefs.theme;
+                _skinPref = prefs.skin;
+                _prefsPrimed = true;
+                resolve(prefs);
+            });
+        });
+    }
+    return _primePromise;
+}
+
+// Kick it off at load. Everything below reads the answer synchronously.
+primePanelPrefs();
 
 // Follow live YouTube theme toggles while the override is on 'system'.
 function ensureYtThemeObserver() {
@@ -221,6 +251,8 @@ function applyPlayerHeight() {
     const header = panel.querySelector('.yt-timestamps-panel-header');
     const headerH = header ? header.offsetHeight : 45;
 
+    measureDockAnchor(panel);
+
     if (!player) {
         const fallback = 550;
         if (_lastAppliedHeight === fallback) return;
@@ -253,6 +285,50 @@ function applyPlayerHeight() {
     if (body) body.style.maxHeight = `${accordionMaxH}px`;
 }
 
+// Where the docked playback marker hangs from when the point playing now is
+// above the fold: under the header, never over it, and with no seam between the
+// two.
+//
+// Measured off rectangles rather than `offsetHeight`, which is rounded to a
+// whole pixel. A header that really stands 45.6px tall reports 46, the dock
+// hangs a fraction of a pixel too low, and that fraction is a hairline of the
+// list showing through the gap — the exact seam the scrim exists to close.
+// `top` resolves against the panel's padding box, so its border comes off.
+function measureDockAnchor(panel) {
+    if (!panel) return;
+    const body = panel.querySelector('.yt-accordion-body');
+    if (!body) return;
+
+    const panelRect = panel.getBoundingClientRect();
+    if (panelRect.height <= 0) return;      // hidden panel: nothing to measure
+
+    const borderTop = parseFloat(getComputedStyle(panel).borderTopWidth) || 0;
+    const top = body.getBoundingClientRect().top - panelRect.top - borderTop;
+    panel.style.setProperty('--yt-dock-top', `${Math.max(0, top)}px`);
+}
+
+// The header's height is not fixed: a web font landing late, a narrow sidebar
+// wrapping the title, or a theme change all move it, and only some of those
+// come with a window resize to re-measure on.
+function observeHeaderHeight(panel) {
+    disconnectHeaderObserver();
+    if (typeof ResizeObserver !== 'function' || !panel) return;
+    const header = panel.querySelector('.yt-timestamps-panel-header');
+    if (!header) return;
+    _headerObserver = new ResizeObserver(() => measureDockAnchor(panel));
+    // The border box, not the default content box: what the dock hangs from is
+    // the header's outer edge, and padding or a border can move that on its own
+    // — switching skins alone takes the header's bottom border from 2px to 1px.
+    _headerObserver.observe(header, { box: 'border-box' });
+}
+
+function disconnectHeaderObserver() {
+    if (_headerObserver) {
+        _headerObserver.disconnect();
+        _headerObserver = null;
+    }
+}
+
 function observePlayerResize() {
     disconnectPlayerObserver();
     _resizeHandler = () => {
@@ -260,6 +336,9 @@ function observePlayerResize() {
         _resizeTimer = setTimeout(() => {
             const player = findVideoPlayer();
             applyPlayerHeight();
+            // The panel just changed height, so a row that was on screen may not
+            // be any more — and the dock hangs off the header we just remeasured.
+            syncPlaybackDock();
         }, 100);
     };
     window.addEventListener('resize', _resizeHandler);
@@ -277,6 +356,343 @@ function disconnectPlayerObserver() {
     _lastAppliedHeight = 0;
 }
 
+// --- Current playback indicator ----------------------------------------------
+//
+// Two halves of one feature, and they answer different questions. The row state
+// answers "which point am I in" while that point is on screen. The docked marker
+// answers "where did it go" when it isn't — and it *offers* the scroll rather
+// than performing one. The list never moves unless the user asks it to.
+//
+// The player's own `timeupdate` drives everything. It fires roughly four times a
+// second, which is ample for chapter granularity and for a hairline crossing a
+// point that lasts minutes, so nothing here polls or runs a frame loop. The one
+// rAF in the file coalesces scroll events for the dock.
+
+// Points sorted by time rather than by DOM order: a model can return its
+// timestamps out of sequence, and "the last point at or before the playhead"
+// should still resolve correctly when it does.
+let _pbPoints = null;
+let _pbVideo = null;
+let _pbScroll = null;        // the panel's scroll container (.yt-accordion-body)
+let _pbDock = null;
+let _pbDockTime = null;
+let _pbDockTitle = null;
+let _pbDockArrow = null;
+let _pbActive = null;        // the row element currently marked "now"
+let _pbDocked = false;       // is the dock showing? (one half of the hysteresis)
+let _pbDir = 'up';           // which edge the active row went out by
+let _pbScrollRaf = 0;
+let _pbOnTime = null;
+let _pbOnScroll = null;
+let _pbAttachTimer = null;
+let _pbLastTime = null;      // to tell playback drift from a seek
+let _headerObserver = null;
+
+// A row becomes current the moment the playhead reaches it. Seeking is not
+// frame-exact — setting currentTime lands on the nearest keyframe, which can be
+// a shade early — so a click on a row marks that row rather than the one before.
+const PB_SEEK_TOLERANCE = 0.35;
+
+// The dock appears once the active row is fully outside the scroll viewport and
+// only goes away once the row is back inside by this much. The gap between the
+// two tests is a dead zone; without it the dock flickers as a row grazes an edge.
+const PB_DOCK_DEADZONE = 28;
+
+const PB_VIDEO_EVENTS = ['timeupdate', 'seeked', 'play', 'pause'];
+
+// `timeupdate` arrives about every 250ms, so the progress hairline would step
+// four times a second if it were painted straight from it. Instead each update
+// sets the new width and CSS carries it there linearly over slightly longer than
+// one tick (see --yt-progress-ease), which arrives before the step ends and
+// keeps the hairline continuously in motion. The lag that buys is a fraction of
+// a second across a point that lasts minutes.
+//
+// That only holds while time moves at playback speed. A jump this size or larger
+// is a seek, and a seek should land rather than glide.
+const PB_SEEK_JUMP = 1.5;
+
+// Write a progress width, suppressing the easing when the value is discontinuous
+// — a seek, or a point that has only just become current.
+function setProgressWidth(el, pct, instant) {
+    if (!el) return;
+    if (instant) {
+        el.classList.add('yt-progress-jump');
+        el.style.setProperty('--yt-now-progress', pct);
+        void el.offsetWidth;                 // commit the width with no transition
+        el.classList.remove('yt-progress-jump');
+        return;
+    }
+    el.style.setProperty('--yt-now-progress', pct);
+}
+
+function prefersReducedMotion() {
+    return typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Seek to the point playing now. Delegates to the row's own click handler so the
+// seek and its confirmation pulse have exactly one implementation.
+function seekToActivePoint() {
+    if (_pbActive) _pbActive.click();
+}
+
+// Scroll the list to the point playing now — the only scroll this feature ever
+// performs, and only because the dock was clicked.
+function scrollToActivePoint() {
+    if (!_pbActive || !_pbScroll) return;
+    const rowRect = _pbActive.getBoundingClientRect();
+    const boxRect = _pbScroll.getBoundingClientRect();
+    const centred = Math.max(0, (_pbScroll.clientHeight - rowRect.height) / 2);
+    const top = _pbScroll.scrollTop + (rowRect.top - boxRect.top) - centred;
+    _pbScroll.scrollTo({
+        top: Math.max(0, top),
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+    });
+}
+
+function buildPlaybackDock(panel) {
+    // Two layers. The outer rail spans the panel's full width and carries the
+    // blurred scrim that covers the gap between the card and the panel edge —
+    // without it, list rows scroll visibly through that slit. The card inside is
+    // the only part that takes clicks, because the rail's fade region sits over
+    // rows the user can still see and reach.
+    const dock = document.createElement('div');
+    dock.className = 'yt-now-dock';
+
+    const card = document.createElement('div');
+    card.className = 'yt-now-dock-card';
+
+    // Two verbs, so two real buttons side by side rather than one nested in the
+    // other: seek the video, or scroll the list to where the video already is.
+    const seek = document.createElement('button');
+    seek.type = 'button';
+    seek.className = 'yt-now-dock-seek';
+    seek.title = 'Jump the video to this point';
+
+    const glyph = document.createElement('span');
+    glyph.className = 'yt-now-dock-glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    _pbDockTime = document.createElement('span');
+    _pbDockTime.className = 'yt-now-dock-time';
+    seek.appendChild(glyph);
+    seek.appendChild(_pbDockTime);
+
+    const jump = document.createElement('button');
+    jump.type = 'button';
+    jump.className = 'yt-now-dock-jump';
+    jump.title = 'Scroll the list to the point playing now';
+
+    _pbDockTitle = document.createElement('span');
+    _pbDockTitle.className = 'yt-now-dock-title';
+    // Polite, and on the title alone. A screen reader should hear the chapter
+    // change once it happens, not have every change cut off the sentence before
+    // it. While the dock is hidden it is `visibility: hidden`, so nothing is
+    // announced for a point the user can already see.
+    _pbDockTitle.setAttribute('aria-live', 'polite');
+
+    _pbDockArrow = document.createElement('span');
+    _pbDockArrow.className = 'yt-now-dock-arrow';
+    _pbDockArrow.setAttribute('aria-hidden', 'true');
+    _pbDockArrow.textContent = '↑';
+
+    jump.appendChild(_pbDockTitle);
+    jump.appendChild(_pbDockArrow);
+
+    const fill = document.createElement('span');
+    fill.className = 'yt-now-dock-fill';
+    fill.setAttribute('aria-hidden', 'true');
+
+    card.appendChild(seek);
+    card.appendChild(jump);
+    card.appendChild(fill);
+    dock.appendChild(card);
+
+    seek.addEventListener('click', seekToActivePoint);
+    jump.addEventListener('click', scrollToActivePoint);
+
+    panel.appendChild(dock);
+    return dock;
+}
+
+// Show the dock only while the current point is off screen, and remember which
+// edge it left by so the arrow points the right way.
+function syncPlaybackDock() {
+    if (!_pbDock || !_pbScroll) return;
+
+    if (!_pbActive || _pbScroll.classList.contains('collapsed')) {
+        setDockVisible(false);
+        return;
+    }
+
+    const rowRect = _pbActive.getBoundingClientRect();
+    const boxRect = _pbScroll.getBoundingClientRect();
+    if (boxRect.height <= 0) {
+        setDockVisible(false);
+        return;
+    }
+
+    const above = rowRect.bottom <= boxRect.top + 2;
+    const below = rowRect.top >= boxRect.bottom - 2;
+    const wellInside = rowRect.bottom > boxRect.top + PB_DOCK_DEADZONE
+        && rowRect.top < boxRect.bottom - PB_DOCK_DEADZONE;
+
+    // Inside the dead zone neither test fires, so whichever state we are in
+    // holds — and the arrow keeps pointing the way the row actually went.
+    if (above) _pbDir = 'up';
+    else if (below) _pbDir = 'down';
+
+    const show = _pbDocked ? !wellInside : (above || below);
+    if (show) {
+        _pbDock.classList.toggle('yt-dock-below', _pbDir === 'down');
+        _pbDockArrow.textContent = _pbDir === 'down' ? '↓' : '↑';
+    }
+    setDockVisible(show);
+}
+
+function setDockVisible(on) {
+    if (_pbDocked === on) return;
+    _pbDocked = on;
+    _pbDock.classList.toggle('yt-dock-on', on);
+}
+
+function queueDockSync() {
+    if (_pbScrollRaf) return;
+    _pbScrollRaf = requestAnimationFrame(() => {
+        _pbScrollRaf = 0;
+        syncPlaybackDock();
+    });
+}
+
+function updatePlaybackIndicator() {
+    if (!_pbPoints || !_pbVideo) return;
+
+    const now = _pbVideo.currentTime;
+
+    // Playback drift, or a jump? Comparing against the last reading catches a
+    // scrub as well as a seek, without either needing its own event.
+    const jumped = _pbLastTime === null || Math.abs(now - _pbLastTime) > PB_SEEK_JUMP;
+    _pbLastTime = now;
+
+    // The last point at or before the playhead.
+    let idx = -1;
+    for (let i = 0; i < _pbPoints.length; i++) {
+        if (_pbPoints[i].sec <= now + PB_SEEK_TOLERANCE) idx = i;
+        else break;
+    }
+
+    const active = idx >= 0 ? _pbPoints[idx] : null;
+    // Before the first point — a summary whose first timestamp is not 0:00 —
+    // nothing is current, and nothing is marked.
+    const activeSec = active ? active.sec : Number.NEGATIVE_INFINITY;
+    const changed = (active ? active.el : null) !== _pbActive;
+
+    if (changed) {
+        for (const point of _pbPoints) {
+            const isNow = point === active;
+            point.el.classList.toggle('yt-now', isNow);
+            point.el.classList.toggle('yt-past', !isNow && point.sec < activeSec);
+            if (isNow) point.el.setAttribute('aria-current', 'true');
+            else point.el.removeAttribute('aria-current');
+        }
+        _pbActive = active ? active.el : null;
+
+        if (active && _pbDockTime && _pbDockTitle) {
+            // Both come from model output, so both are set as text.
+            const timeEl = active.el.querySelector('.yt-time-text');
+            const titleEl = active.el.querySelector('.yt-title');
+            _pbDockTime.textContent = timeEl ? timeEl.textContent : '';
+            _pbDockTitle.textContent = titleEl ? titleEl.textContent : '';
+        }
+    }
+
+    // How far through the current point the playhead is, so a nine-minute
+    // chapter doesn't look identical at 0:10 and 8:50. A live stream has no
+    // finite duration to measure the last point against; there the fill stays
+    // empty rather than guessing.
+    if (active) {
+        const next = idx + 1 < _pbPoints.length ? _pbPoints[idx + 1].sec : _pbVideo.duration;
+        let progress = 0;
+        if (isFinite(next) && next > active.sec) {
+            progress = Math.max(0, Math.min(1, (now - active.sec) / (next - active.sec)));
+        }
+        const pct = `${(progress * 100).toFixed(2)}%`;
+        // A row that has only just become current starts from whatever width it
+        // was left at, so that first write lands rather than sliding.
+        const instant = jumped || changed;
+        setProgressWidth(active.el, pct, instant);
+        setProgressWidth(_pbDock, pct, instant);
+    }
+
+    syncPlaybackDock();
+}
+
+function attachPlaybackVideo(attempt) {
+    // Same lookup the row's seek handler uses. If the two ever disagreed, the
+    // indicator would follow one element while clicks moved another.
+    const video = document.querySelector('video');
+    if (!video) {
+        // YouTube swaps the media element around navigation and the miniplayer.
+        // Wait a few beats, then leave the panel as it is — an unmarked list is
+        // the pre-feature panel, which is a fine thing to fall back to.
+        if (attempt >= 8) return;
+        _pbAttachTimer = setTimeout(() => attachPlaybackVideo(attempt + 1), 400);
+        return;
+    }
+
+    _pbVideo = video;
+    _pbOnTime = () => updatePlaybackIndicator();
+    for (const evt of PB_VIDEO_EVENTS) video.addEventListener(evt, _pbOnTime);
+    updatePlaybackIndicator();
+}
+
+function startPlaybackTracking(points, panel, scrollContainer) {
+    stopPlaybackTracking();
+    if (!points || points.length === 0 || !panel || !scrollContainer) return;
+
+    _pbPoints = points.slice().sort((a, b) => a.sec - b.sec);
+    _pbScroll = scrollContainer;
+    _pbDock = buildPlaybackDock(panel);
+
+    _pbOnScroll = queueDockSync;
+    _pbScroll.addEventListener('scroll', _pbOnScroll, { passive: true });
+    observeHeaderHeight(panel);
+
+    attachPlaybackVideo(0);
+}
+
+function stopPlaybackTracking() {
+    if (_pbAttachTimer) {
+        clearTimeout(_pbAttachTimer);
+        _pbAttachTimer = null;
+    }
+    if (_pbScrollRaf) {
+        cancelAnimationFrame(_pbScrollRaf);
+        _pbScrollRaf = 0;
+    }
+    if (_pbVideo && _pbOnTime) {
+        for (const evt of PB_VIDEO_EVENTS) _pbVideo.removeEventListener(evt, _pbOnTime);
+    }
+    if (_pbScroll && _pbOnScroll) {
+        _pbScroll.removeEventListener('scroll', _pbOnScroll);
+    }
+    if (_pbDock) _pbDock.remove();
+    disconnectHeaderObserver();
+
+    _pbPoints = null;
+    _pbVideo = null;
+    _pbScroll = null;
+    _pbDock = null;
+    _pbDockTime = null;
+    _pbDockTitle = null;
+    _pbDockArrow = null;
+    _pbActive = null;
+    _pbOnTime = null;
+    _pbOnScroll = null;
+    _pbDocked = false;
+    _pbDir = 'up';
+    _pbLastTime = null;
+}
+
 // The "Detail" presets, ordered from least to most detail. `value` is what we
 // send to the backend and persist as the sticky default (SUMMARY_LENGTH); `label`
 // is shown to the user; `help` is the longer explanation revealed by the "?" icon.
@@ -288,6 +704,16 @@ const DETAIL_OPTIONS = [
     { value: 'detailed', label: 'In-depth', short: 'Every topic, with concrete specifics.', help: 'A thorough breakdown — every distinct topic with concrete specifics like names, numbers, and examples, so you rarely need to watch the video.' }
 ];
 const DETAIL_DEFAULT_INDEX = 1;
+
+// The level the panel should open on: whatever the user last generated with,
+// falling back to Standard. Reads the in-memory preferences, which the mount
+// has already waited for (see primePanelPrefs) — asking the background here
+// instead is what used to make the chip render "Standard" and then correct
+// itself to the real level a moment later.
+function storedDetailIndex() {
+    const stored = DETAIL_OPTIONS.findIndex((o) => o.value === _panelPrefs.summaryLength);
+    return stored === -1 ? DETAIL_DEFAULT_INDEX : stored;
+}
 
 // The level currently selected in the empty-state chip. Moving the slider updates
 // this in memory only; it's not persisted as the default until the user actually
@@ -301,10 +727,8 @@ let _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
 // Returns the chip wrapper; the popover is mounted onto the panel container on
 // open (so the panel's overflow:hidden can't clip it).
 function buildDetailChip() {
-    let index = DETAIL_DEFAULT_INDEX;
-    // Start from the default; the stored default (if any) is applied once the
-    // async storage read below resolves.
-    _pendingDetail = DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX].value;
+    let index = storedDetailIndex();
+    _pendingDetail = DETAIL_OPTIONS[index].value;
     let open = false;
     let helpOpen = false;
     let dragging = false;
@@ -611,11 +1035,12 @@ function buildDetailChip() {
 
     render();
 
-    // Sync to the stored default (whatever the user last generated with) once
-    // the background answers. This only updates the in-memory selection/display.
+    // Confirm against the background. Normally this agrees with what was just
+    // drawn; it only moves the chip in the degraded case where the mount's
+    // bounded wait for the preferences timed out. In-memory selection only.
     readPanelPrefs((prefs) => {
         const stored = DETAIL_OPTIONS.findIndex((o) => o.value === prefs.summaryLength);
-        if (stored !== -1) select(stored);
+        if (stored !== -1 && stored !== index) select(stored);
     });
 
     return wrap;
@@ -631,7 +1056,7 @@ function buildDetailChip() {
 // describing a summary that was never made at that level.
 function buildBriefingDetail(meta) {
     const generated = DETAIL_OPTIONS.find((o) => o.value === meta?.length);
-    const label = (generated || DETAIL_OPTIONS[DETAIL_DEFAULT_INDEX]).label;
+    const label = (generated || DETAIL_OPTIONS[storedDetailIndex()]).label;
 
     const provenance = [];
     if (meta?.modelId) provenance.push(meta.modelId);
@@ -738,7 +1163,9 @@ const GEAR_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" st
 function renderEmptyState(container) {
     if (!container) return;
 
-    // Clear whatever was there (summary or prior empty state) and drop the DOM cache.
+    // Clear whatever was there (summary or prior empty state) and drop the DOM
+    // cache. There are no points to follow once the summary is gone.
+    stopPlaybackTracking();
     container.innerHTML = '';
     _invalidateCache();
     container.classList.remove('yt-has-summary');
@@ -832,11 +1259,13 @@ function renderEmptyState(container) {
     // Re-apply after a short delay to catch late layout shifts
     setTimeout(applyPlayerHeight, 500);
 
-    // Load the theme + skin preferences and keep the panel in sync with live
-    // YouTube theme toggles (when following the system). The skin affects the
-    // markup built above (ghost preview, Detail slider variant), so if the
-    // stored skin differs from the one this render assumed, rebuild once with
-    // the right one — the re-entrant call sees the matching pref and settles.
+    // Re-read the preferences and keep the panel in sync with live YouTube theme
+    // toggles (when following the system). The mount already waited for the
+    // first answer, so this normally confirms what was drawn; the rebuild below
+    // is the fallback for the case where it could not — a bounded wait that
+    // timed out — since the skin affects the markup built above (ghost preview,
+    // Detail slider variant) and not just its CSS. The re-entrant call sees the
+    // matching pref and settles.
     const renderedSkin = _skinPref;
     readPanelPrefs((prefs) => {
         _themePref = prefs.theme;
@@ -852,17 +1281,44 @@ function renderEmptyState(container) {
     });
 }
 
-// Function to inject sidebar into the DOM
+let _mountPending = false;
+
+// Function to inject sidebar into the DOM.
+//
+// The panel is built once, in the skin and theme the user actually chose. On
+// the very first mount of a page those are still in flight (see
+// primePanelPrefs), so the mount waits for them: drawing Classic and correcting
+// to Quiet a moment later is a flash the user sees on every load. Every later
+// mount — SPA navigation, miniplayer toggle — has the answer already and is
+// synchronous, as before.
 function injectSidebar(secondary) {
     if (document.querySelector('.yt-timestamps-container')) return;
 
+    if (!_prefsPrimed) {
+        if (_mountPending) return;
+        _mountPending = true;
+        const bounded = new Promise((resolve) => setTimeout(resolve, PREFS_PRIME_TIMEOUT_MS));
+        Promise.race([primePanelPrefs(), bounded]).then(() => {
+            _mountPending = false;
+            // The page can move on while we wait; YouTube tears the sidebar out
+            // on navigation, and resetSidebar may have mounted one since.
+            if (!secondary.isConnected) return;
+            if (document.querySelector('.yt-timestamps-container')) return;
+            mountSidebar(secondary);
+        });
+        return;
+    }
+
+    mountSidebar(secondary);
+}
+
+function mountSidebar(secondary) {
     // Create container element
     const container = document.createElement('div');
     container.className = 'yt-timestamps-container';
-    // Apply the theme up-front (follows YouTube by default) to avoid a flash.
-    // The skin uses the in-memory pref so SPA re-injects don't flash Classic
-    // while the async storage read in renderEmptyState resolves.
-    applyPanelTheme('system', container);
+    // Apply the theme and skin up-front, before the container is in the
+    // document, so the panel's first paint is already the right one.
+    applyPanelTheme(_themePref, container);
     applyPanelSkin(_skinPref, container);
 
     // Inject into #secondary-inner so we don't push the sticky engagement panels container down
@@ -1591,7 +2047,10 @@ function renderTimestampsUI(summaryText, meta) {
     const container = document.querySelector('.yt-timestamps-container');
     if (!container) return;
     
-    // Clear existing content and invalidate cached DOM references
+    // Clear existing content and invalidate cached DOM references. The playback
+    // tracker holds listeners on the player and on the old scroll container, so
+    // it has to be released before either goes away.
+    stopPlaybackTracking();
     container.innerHTML = '';
     _invalidateCache();
     container.classList.add('yt-has-summary');
@@ -1662,6 +2121,9 @@ function renderTimestampsUI(summaryText, meta) {
     // the figures on its rail describe what the rows turned out to be.
     const { overview, lines } = splitOverview(summaryText);
     let itemCount = 0;
+    // {sec, el} for every rendered point, handed to the playback tracker once
+    // the panel is in the document.
+    const playbackPoints = [];
     // Render order index, set as a CSS custom property on each section header
     // and row. Classic ignores it; the Quiet skin uses it to stagger the
     // entrance cascade when a summary first renders. Index 0 is reserved for
@@ -1808,6 +2270,8 @@ function renderTimestampsUI(summaryText, meta) {
                 tsDiv.classList.add('yt-seek-pulse');
             };
             
+            playbackPoints.push({ sec, el: tsDiv });
+
             timestampsList.appendChild(tsDiv);
             timestampsList.appendChild(accordionContent);
         }
@@ -1840,7 +2304,12 @@ function renderTimestampsUI(summaryText, meta) {
     _lastAppliedHeight = 0;
     applyPlayerHeight();
     observePlayerResize();
-    
+
+    // Follow the playhead. Needs the panel measured and in the document: the
+    // dock hangs off the header's height, and deciding whether the current row
+    // is on screen means reading real rectangles.
+    startPlaybackTracking(playbackPoints, panel, panelContent);
+
     // Accordion toggle for the entire summary
     let isSummaryExpanded = true;
     panelHeader.addEventListener('click', () => {
@@ -1852,6 +2321,8 @@ function renderTimestampsUI(summaryText, meta) {
             panelContent.classList.add('collapsed');
             toggleIcon.classList.add('collapsed');
         }
+        // A collapsed panel is only its header; the dock has nothing to point at.
+        syncPlaybackDock();
     });
 }
 

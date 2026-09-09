@@ -9,6 +9,30 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Added
+
+- A current playback indicator: the summary point playing now is marked as the
+  video moves, with a progress hairline across the row so a long chapter does
+  not look the same at its start and its end. When that row scrolls out of
+  view, a marker docks under the header carrying its timestamp and title — one
+  control seeks the video there, the other scrolls the list back to it. The
+  list never scrolls on its own.
+
+### Changed
+
+- Rewritten README: a screenshot tour of the panel, an install walkthrough for
+  people who have never loaded an unpacked extension, a troubleshooting
+  section, diagrams of the summary pipeline and the key-isolation boundary, and
+  reference tables for detail levels, providers, permissions and the
+  development commands.
+
+### Fixed
+
+- The panel is drawn in the user's own skin and detail level on first paint,
+  instead of mounting with the module defaults and correcting itself once the
+  background answered — which showed as Classic swapping to Quiet, and the
+  Detail chip sliding off Standard, on every page load.
+
 ## 1.2 — 2026-09-08
 
 First published release. The extension worked before this, but could only be

@@ -104,6 +104,12 @@
   border-top-right-radius: 16px;
   cursor: pointer;
   user-select: none;
+  /* Outranks the docked playback marker (z-index 12), which tucks its scrim a
+     couple of pixels up under the header so no sub-pixel seam can open between
+     them. The header painting on top is what keeps its own border intact.
+     Stays below the settings hint at 40. */
+  position: relative;
+  z-index: 13;
 }
 
 .yt-timestamps-header-left {
@@ -1344,4 +1350,330 @@
 
 .yt-timestamps-container.yt-theme-light .yt-settings-hint-dismiss:hover {
   background: #a30000 !important;
+}
+/* --- Current playback indicator ---------------------------------------------
+   Two halves of one feature: the row playing right now takes on the weight, and
+   when that row is off screen a compact marker docks below the header (or at the
+   foot of the list) with the point's name and a way back to it. Nothing here
+   scrolls the list — the dock offers the scroll, the user takes it.
+   ------------------------------------------------------------------------- */
+
+/* The scrim tone sits a touch under the panel's own surface in each theme, so
+   the covered strip reads as the panel rather than as a separate sheet. */
+.yt-timestamps-container {
+  --yt-dock-scrim: rgba(13, 13, 13, 0.92);
+  /* One tick of `timeupdate` is ~250ms; easing a little longer keeps the
+     hairline moving continuously instead of arriving and waiting. */
+  --yt-progress-ease: 0.3s;
+}
+
+.yt-timestamps-container.yt-theme-light {
+  --yt-dock-scrim: rgba(242, 242, 242, 0.94);
+}
+
+/* The point playing now. Classic rows are bordered cards, so the accent goes on
+   the card's own edge and its chip rather than a rule down the side. */
+.yt-timestamp-item.yt-now {
+  background: #262626;
+  border-color: #FF0033;
+}
+
+.yt-timestamp-item.yt-now .yt-time {
+  background: #FF0033;
+  color: #fff !important;
+}
+
+.yt-timestamp-item.yt-now .yt-title {
+  color: #fff !important;
+}
+
+/* Progress *through* the current point, so a nine-minute chapter does not look
+   identical at 0:10 and 8:50. On ::after because ::before is the seek pulse. */
+.yt-timestamp-item.yt-now::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--yt-now-progress, 0%);
+  background: #FF0033;
+  opacity: 0.75;
+  pointer-events: none;
+  /* Longer than one `timeupdate` (~250ms) and linear, so the next step begins
+     before this one lands and the hairline never visibly ticks. */
+  transition: width var(--yt-progress-ease, 0.3s) linear;
+}
+
+/* Points already played: quieter, never faded. Dimmed text in a 402px column
+   stops being readable at a glance, which is the opposite of the point. */
+.yt-timestamp-item.yt-past .yt-time {
+  background: rgba(255, 255, 255, 0.07);
+  color: #8a8a8a !important;
+}
+
+.yt-timestamp-item.yt-past .yt-title {
+  color: #9a9a9a !important;
+}
+
+/* The docked marker. `--yt-dock-top` is the measured header height, set by
+   applyPlayerHeight() — the dock sits under the header, never across it.
+
+   Two layers. This outer rail is full-bleed and holds the scrim; the card
+   inside it is the visible object. Without the scrim the gap between card and
+   panel edge is a see-through slit that list rows scroll through. */
+.yt-now-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--yt-dock-top, 46px);
+  z-index: 12;
+  padding: 8px 10px 18px;
+  opacity: 0;
+  transform: translateY(-6px);
+  /* `visibility` rather than opacity alone: a hidden dock must also be out of
+     the tab order and silent to a screen reader. */
+  visibility: hidden;
+  /* The rail's fade region covers rows the user can still see and click, so the
+     rail itself never takes a pointer — only the card does. */
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+/* Solid against the panel edge, fading out over the padding that faces the
+   list. Masked as well as tinted so the blur fades with the colour rather than
+   ending on a hard line. */
+.yt-now-dock::before {
+  content: '';
+  position: absolute;
+  /* Overlaps the header by 2px. `offsetHeight` rounding, page zoom and
+     fractional device pixels can each leave a hairline of the list showing at
+     the join; the overlap absorbs all of them. The panel's own overflow keeps
+     it from escaping. */
+  inset: -2px 0 0;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--yt-dock-scrim) 0,
+    var(--yt-dock-scrim) calc(100% - 18px),
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 18px), transparent 100%);
+  pointer-events: none;
+}
+
+/* Below the fold the marker docks to the foot of the list, and the scrim turns
+   over with it. */
+.yt-now-dock.yt-dock-below {
+  top: auto;
+  bottom: 0;
+  padding: 18px 10px 10px;
+  transform: translateY(6px);
+}
+
+.yt-now-dock.yt-dock-below::before {
+  inset: 0 0 -2px;
+  background: linear-gradient(
+    to top,
+    var(--yt-dock-scrim) 0,
+    var(--yt-dock-scrim) calc(100% - 18px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to top, #000 0, #000 calc(100% - 18px), transparent 100%);
+}
+
+.yt-now-dock.yt-dock-on {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.yt-now-dock-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.yt-now-dock.yt-dock-on .yt-now-dock-card {
+  pointer-events: auto;
+}
+
+/* Two verbs, two buttons: seek the video, or scroll the list to it. */
+.yt-now-dock-seek {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: #FF0033;
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.yt-now-dock-glyph {
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+}
+
+.yt-now-dock-jump {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yt-now-dock-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yt-now-dock-arrow {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cfcfcf;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.yt-now-dock-jump:hover .yt-now-dock-arrow {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.yt-now-dock-seek:focus-visible,
+.yt-now-dock-jump:focus-visible {
+  outline: 2px solid #FF0033;
+  outline-offset: 2px;
+}
+
+.yt-now-dock-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--yt-now-progress, 0%);
+  background: #FF0033;
+  opacity: 0.8;
+  pointer-events: none;
+  transition: width var(--yt-progress-ease, 0.3s) linear;
+}
+
+/* Set for one frame around a discontinuous write — a seek, or a point that has
+   only just become current — so the hairline lands instead of gliding. */
+.yt-timestamp-item.yt-progress-jump::after,
+.yt-now-dock.yt-progress-jump .yt-now-dock-fill {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt-now-dock,
+  .yt-now-dock.yt-dock-below {
+    transform: none;
+    transition: opacity 0.001ms, visibility 0.001ms;
+  }
+
+  /* A hairline sliding continuously is exactly the ambient motion this setting
+     asks us to drop; let it step with the player instead. */
+  .yt-timestamp-item.yt-now::after,
+  .yt-now-dock-fill {
+    transition: none;
+  }
+}
+
+/* Classic, light theme */
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-now {
+  background: #fff4f4;
+  border-color: #cc0000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-now .yt-time {
+  background: #cc0000;
+  color: #fff !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-now .yt-title {
+  color: #0f0f0f !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-now::after {
+  background: #cc0000;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-past .yt-time {
+  background: rgba(0, 0, 0, 0.05);
+  color: #909090 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-timestamp-item.yt-past .yt-title {
+  color: #808080 !important;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: #e0e0e0;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-seek {
+  background: #cc0000;
+  color: #fff;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-jump {
+  color: #0f0f0f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-arrow {
+  background: rgba(0, 0, 0, 0.06);
+  color: #606060;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-jump:hover .yt-now-dock-arrow {
+  background: rgba(0, 0, 0, 0.11);
+  color: #0f0f0f;
+}
+
+.yt-timestamps-container.yt-theme-light .yt-now-dock-fill {
+  background: #cc0000;
 }

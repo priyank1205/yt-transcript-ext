@@ -28,6 +28,11 @@ function resetSidebar() {
     if (typeof disconnectPlayerObserver === 'function') {
         disconnectPlayerObserver();
     }
+    // The tracker holds listeners on the outgoing video element; release them
+    // before YouTube swaps it for the next one.
+    if (typeof stopPlaybackTracking === 'function') {
+        stopPlaybackTracking();
+    }
     const container = document.querySelector('.yt-timestamps-container');
     if (container) container.remove();
     if (typeof _invalidateCache === 'function') {

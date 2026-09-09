@@ -50,6 +50,8 @@
   --q-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   --q-pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   --q-scrollbar: rgba(255, 255, 255, 0.18);
+  --q-veil: rgba(26, 26, 26, 0.93);
+  --yt-dock-scrim: rgba(24, 24, 24, 0.92);
 }
 
 .yt-timestamps-container.yt-theme-light.yt-skin-quiet {
@@ -81,6 +83,8 @@
   --q-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --q-pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
   --q-scrollbar: rgba(0, 0, 0, 0.2);
+  --q-veil: rgba(255, 255, 255, 0.95);
+  --yt-dock-scrim: rgba(255, 255, 255, 0.94);
 }
 
 /* --- Panel shell ---------------------------------------------------------- */
@@ -884,4 +888,95 @@
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+/* --- Current playback indicator ----------------------------------------------
+   Quiet has no card edges to accent, so the current row is marked the way the
+   skin already marks intent: the rule the panel uses nowhere else, and the chip
+   the hover state was already promising. Held open rather than newly invented.
+   --------------------------------------------------------------------------- */
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now {
+  background: var(--q-hover);
+  /* An inset shadow, not ::before — that pseudo-element is the seek pulse. */
+  box-shadow: inset 2px 0 0 var(--q-accent);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now .yt-time {
+  background: var(--q-accent);
+  color: var(--q-on-accent) !important;
+}
+
+/* Hold the hover affordance open: glyph in, digits nudged across. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now .yt-time::before {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now .yt-time-text {
+  transform: translateX(3px);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now .yt-title {
+  font-weight: 500 !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-now::after {
+  height: 1.5px;
+  background: var(--q-accent);
+  opacity: 0.55;
+}
+
+/* Played points step back by colour, not by opacity — two font weights and a
+   colour ramp is the whole hierarchy in this skin. */
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-past .yt-time {
+  background: transparent;
+  color: var(--q-text-3) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-timestamp-item.yt-past .yt-title {
+  color: var(--q-text-2) !important;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-card {
+  background: var(--q-veil);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-color: var(--q-border);
+  border-radius: 9px;
+  box-shadow: var(--q-pop-shadow);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-seek {
+  background: var(--q-accent-tint);
+  color: var(--q-accent-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 5px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-jump {
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-arrow {
+  background: var(--q-chip);
+  color: var(--q-text-2);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-jump:hover .yt-now-dock-arrow {
+  background: var(--q-chip-hover);
+  color: var(--q-text-1);
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-seek:focus-visible,
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-jump:focus-visible {
+  outline: 2px solid var(--q-focus);
+  outline-offset: 2px;
+}
+
+.yt-timestamps-container.yt-skin-quiet .yt-now-dock-fill {
+  height: 1.5px;
+  background: var(--q-accent);
+  opacity: 0.6;
 }
