@@ -3,6 +3,9 @@ ROADMAP.md
 audit/
 .DS_Store
 
+# Editor/agent workspace config: holds absolute paths from one machine
+.claude/
+
 # Build output and tooling
 dist/
 node_modules/

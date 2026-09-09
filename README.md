@@ -17,9 +17,7 @@ A sectioned, timestamped AI summary lives in the YouTube sidebar — click any l
 
 [**Install**](#install) · [**Set up a key**](#step-3--add-an-api-key) · [**Troubleshooting**](#troubleshooting) · [**How it works**](#how-it-works) · [**Privacy**](#privacy-and-data-handling) · [**Development**](#development)
 
-<img src="docs/screenshots/panel-on-video-page.jpg" alt="The Timestamped Summary panel sitting in the YouTube sidebar beside a playing video, showing its empty state with a Generate summary button">
-
-<sup>Screenshots show a public video from the Dwarkesh Podcast.</sup>
+<img src="docs/screenshots/panel-on-video-page.png" alt="The Timestamped Summary panel in the YouTube sidebar beside a playing video, showing an overview card above a list of clickable timestamped points">
 
 </div>
 
@@ -34,22 +32,26 @@ This extension builds the index. It reads the video's own transcript, sends it t
 > [!NOTE]
 > **You bring the API key.** There is no server, no account and no subscription in between — the extension talks to your provider directly, and you pay them for what you generate. Google Gemini and Mistral both have free tiers that cover casual use.
 
-<sup>Previously released as *YouTube Transcript Extractor*.</sup>
-
 <br>
 
 ## A guided tour
+
+<div align="center">
+<img src="docs/screenshots/summary-generated.png" width="340" alt="The full panel after generating: an overview card reading 1:43:12 video, 42 points, 6 min read, above sectioned rows such as 0:42 Transforming Electrons to Tokens and 1:46 Nvidia's Core Philosophy">
+</div>
+
+<p align="center"><sup>The whole panel. Below, what each part of it does.</sup></p>
 
 <table>
 <tr>
 <td width="45%"><img src="docs/screenshots/panel-empty-state.png" alt="The panel's empty state: a Timestamped Summary header with an In-depth detail chip and a settings gear, two placeholder rows, the line 'An overview, then chapters linked to the video', and a Generate summary button"></td>
 <td valign="top">
 
-### It's already there
+### Already in the sidebar
 
-Open any video and the panel is waiting at the top of the sidebar — above the recommendations, below nothing. One button.
+Open any video and the panel is sitting at the top of the sidebar, above the recommendations.
 
-Nothing is sent anywhere until you press it.
+One button, and nothing is sent anywhere until you press it.
 
 </td>
 </tr>
@@ -57,23 +59,35 @@ Nothing is sent anywhere until you press it.
 <td><img src="docs/screenshots/detail-selector.png" alt="The Detail selector open on In-depth, with Brief and Standard beside it, above the line 'Every topic, with concrete specifics.'"></td>
 <td valign="top">
 
-### Choose how deep to go
+### Three levels of detail
 
-**Brief** for a skim of what a video covers. **Standard** for the balanced default. **In-depth** when you intend to actually work through the material and want the names, numbers and conclusions preserved.
+**Brief** marks the major sections. **Standard** is the default. **In-depth** keeps the names, numbers and conclusions.
 
-The point count is computed from the video's real runtime, so a two-hour talk earns proportionally more rows than a ten-minute clip — [see the density model](#detail-levels).
+Counts come from the video's real runtime, so a two-hour talk earns more rows than a ten-minute clip — [see the density model](#detail-levels).
 
 </td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/summary-generated.png" alt="A generated summary: an overview card reading 1:43:12 video, 42 points, 6 min read, above sectioned timestamp rows such as 0:42 Transforming Electrons to Tokens"></td>
+<td><img src="docs/screenshots/overview.png" alt="The expanded overview card: a paragraph summarising the video, then 1:43:12 video, 43 points, 7 min read, with Show less, Copy and an In-depth badge"></td>
 <td valign="top">
 
-### An answer, then a map
+### An overview before the outline
 
-The result opens with a **briefing card** — what the video is about, its runtime, how many points were found and how long they take to read — so you can decide in five seconds whether to keep going.
+What the video is actually about, in plain sentences — with its runtime, the number of points and how long they take to read.
 
-Below it, the points are grouped under section headings that follow the video's own structure. Click a timestamp to seek. The row currently playing highlights itself as the video moves.
+Enough to decide in five seconds whether to keep going.
+
+</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/click-timestamp.png" alt="A cursor hovering a summary row whose timestamp reads 4:32 in red with a play triangle, between the rows for 2:53 and 6:11"></td>
+<td valign="top">
+
+### Every row jumps the video
+
+This is the whole point: click a row and the video seeks to that moment. The entire row is the target, not just the timestamp.
+
+The point playing now stays marked as the video moves, so the list always shows you where you are.
 
 </td>
 </tr>
@@ -81,17 +95,27 @@ Below it, the points are grouped under section headings that follow the video's 
 <td><img src="docs/screenshots/timestamp-row-expanded.png" alt="A timestamp row expanded to show its explanation beneath the heading"></td>
 <td valign="top">
 
-### Expand only what you need
+### Open a point for the detail
 
-Headings stay scannable. Open a row for the explanation behind it — and if that answers your question, you never have to play the video at all.
+Headings stay scannable. Expand one for the explanation behind it.
+
+Often that answers the question, and the video never has to play at all.
+
+</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/panel-collapsed.png" alt="The panel collapsed to a single header row reading Timestamped Summary with a Start over control"></td>
+<td valign="top">
+
+### Collapse it when you're watching
+
+The panel folds to a single bar and stays out of the way until you want it back.
+
+**Start over** discards the summary and lets you generate again at a different level.
 
 </td>
 </tr>
 </table>
-
-<img src="docs/screenshots/panel-collapsed.png" alt="The panel collapsed to a single header row with a Start over control">
-
-**And collapse the whole thing** when you would rather just watch. It stays out of the way until you want it back.
 
 <div align="right"><a href="#timestamped-summary-for-youtube">↑ back to top</a></div>
 
