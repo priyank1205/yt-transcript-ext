@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.3.0 — 2026-09-09
+
 ### Added
 
 - A current playback indicator: the summary point playing now is marked as the
