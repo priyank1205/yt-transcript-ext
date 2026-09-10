@@ -9,6 +9,8 @@ section under the new version number when you release.
 
 ## Unreleased
 
+## 1.4.0 — 2026-09-10
+
 ### Added
 
 - A guided first-run setup, opened automatically on install. It asks one
