@@ -252,11 +252,6 @@
       fill: currentColor;
     }
 
-    .model-icon.mistral svg {
-      width: 22px;
-      height: 22px;
-    }
-
     .model-icon.openai { color: #fafafa; }
     
     .delete-custom-btn {
@@ -1273,9 +1268,923 @@
       .content { padding: 22px 18px 26px; }
       .stats-row { flex-direction: column; }
     }
+    /* ======================================================================
+       First-run setup — a three-screen flow shown in place of the settings
+       shell. One question per screen on the left; on the right, the panel the
+       user is about to own. The right column never holds a decision: it is a
+       destination, not a control. Add a button to it and the design is broken.
+       ====================================================================== */
+    /* ==================================================================
+       Daylight — the first-run surface, and the custom-provider sheet.
+
+       Two themes off one token set. The accents are the extension's own
+       reds, desaturated: #cc0000 pulled toward the #752020 already in
+       content.css, so nothing shouts. Grounds and greys are YouTube's.
+       Red is the only thing that asks for a click; caption yellow marks
+       the key and nothing else; green means connected.
+
+       Dark is the default because the rest of settings is dark. The
+       light class is only ever on the body while first-run is showing,
+       so the provider sheet always matches whatever is behind it.
+       ================================================================== */
+    body {
+      --su-bg: #0b0b0c;
+      --su-card: #17171a;
+      --su-panel: #131315;
+      --su-well: #111113;
+      --su-ink: #f3f1ef;
+      --su-mid: #9a9490;
+      --su-faint: #6b6663;
+      --su-line: #232326;
+      --su-line2: #2e2e32;
+      --su-red: #c9483c;
+      --su-red-ink: #e8887f;
+      --su-red-soft: rgba(201, 72, 60, 0.13);
+      --su-red-line: rgba(201, 72, 60, 0.3);
+      --su-on-red: #ffffff;
+      --su-yel: #f7d046;
+      --su-yel-ink: #e5c05c;
+      --su-yel-soft: rgba(247, 208, 70, 0.12);
+      --su-grn: #5bd48a;
+      --su-grn-soft: rgba(91, 212, 138, 0.13);
+      --su-err: #e8887f;
+      --su-err-bg: rgba(232, 136, 127, 0.09);
+      --su-err-ln: rgba(232, 136, 127, 0.22);
+      --su-sh1: 0 1px 2px rgba(0, 0, 0, 0.5);
+      --su-sh2: 0 1px 2px rgba(0, 0, 0, 0.45), 0 20px 42px -22px rgba(0, 0, 0, 0.85);
+      --su-sh3: 0 30px 70px -26px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.4);
+      --su-shbtn: 0 2px 6px rgba(0, 0, 0, 0.35);
+      /* one spacing scale, used everywhere below */
+      --su-1: 8px; --su-2: 12px; --su-3: 16px; --su-4: 20px;
+      --su-5: 24px; --su-6: 28px; --su-7: 36px; --su-8: 44px;
+    }
+    body.setup-light {
+      --su-bg: #f8f6f5;
+      --su-card: #ffffff;
+      --su-panel: #f2efee;
+      --su-well: #f4f1f0;
+      --su-ink: #0f0f0f;
+      --su-mid: #606060;
+      --su-faint: #909090;
+      --su-line: #eae6e5;
+      --su-line2: #ddd7d6;
+      --su-red: #a63229;
+      --su-red-ink: #9b2e25;
+      --su-red-soft: #f7efee;
+      --su-red-line: #e3cecb;
+      --su-yel-ink: #7a5c00;
+      --su-yel-soft: #fbf3dd;
+      --su-grn: #128a4f;
+      --su-grn-soft: #e9f6ef;
+      --su-err: #8f2020;
+      --su-err-bg: #fbf1f0;
+      --su-err-ln: #ebd6d3;
+      --su-sh1: 0 1px 2px rgba(15, 15, 15, 0.06);
+      --su-sh2: 0 1px 2px rgba(15, 15, 15, 0.05), 0 18px 38px -22px rgba(15, 15, 15, 0.3);
+      --su-sh3: 0 28px 64px -24px rgba(15, 15, 15, 0.3), 0 2px 6px rgba(15, 15, 15, 0.07);
+      --su-shbtn: 0 1px 2px rgba(15, 15, 15, 0.14);
+    }
+
+    .setup {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      overflow-y: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px 56px;
+      background: var(--su-bg);
+    }
+    /* `display: flex` above outranks the hidden attribute's own display:none,
+       which would leave this overlay covering the settings page on every visit
+       rather than only during first run. */
+    .setup[hidden] { display: none; }
+    body.setup-on { overflow: hidden; }
+    body.setup-on .app { display: none; }
+
+    .setup-card {
+      position: relative;
+      width: 100%;
+      max-width: 980px;
+      background: var(--su-card);
+      border: 1px solid var(--su-line);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--su-sh3);
+      animation: appIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* Several blocks below set their own display, which outranks the hidden
+       attribute's. Without this, hiding one only makes it invisible to
+       assistive tech while it stays on screen. */
+    .setup [hidden] { display: none !important; }
+
+    /* Each screen owns the whole split, because both halves change together:
+       the panel answers "what am I getting" for the step the form is asking. */
+    .setup-screen { display: none; }
+    .setup-screen.active {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      min-height: 560px;
+      position: relative;
+      animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* ---- theme switch, top right of the card ---- */
+    .su-theme {
+      position: absolute; top: 18px; right: 20px; z-index: 6;
+      display: flex; border: 1px solid var(--su-line2); border-radius: 9px;
+      overflow: hidden; background: var(--su-card);
+    }
+    .su-theme button {
+      display: grid; place-items: center; width: 30px; height: 26px;
+      background: none; border: 0; padding: 0; cursor: pointer; color: var(--su-faint);
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .su-theme button + button { border-left: 1px solid var(--su-line2); }
+    .su-theme button svg { width: 13px; height: 13px; fill: currentColor; }
+    .su-theme button:hover { color: var(--su-ink); }
+    .su-theme button[aria-pressed="true"] { background: var(--su-red); color: var(--su-on-red); }
+
+    /* ---- context panel ---- */
+    .su-panel {
+      background: var(--su-panel);
+      border-right: 1px solid var(--su-line);
+      padding: var(--su-7) 30px;
+      display: flex; flex-direction: column; min-width: 0;
+    }
+    .su-brand { display: flex; align-items: center; gap: 11px; }
+    .su-mk {
+      width: 30px; height: 30px; border-radius: 9px; background: var(--su-red);
+      display: grid; place-items: center; flex: 0 0 auto;
+    }
+    .su-mk svg { width: 13px; height: 13px; fill: #fff; }
+    .su-brand b { display: block; font-size: 14px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; color: var(--su-ink); }
+    .su-brand span { font-size: 11.5px; color: var(--su-mid); }
+    .su-pcap {
+      margin: var(--su-6) 0 var(--su-3);
+      font-size: 12.5px; font-weight: 600; color: var(--su-mid);
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+
+    /* the promise, drawn: what the panel produces on a real video */
+    .su-mock {
+      background: var(--su-card); border: 1px solid var(--su-line);
+      border-radius: 16px; padding: 14px; box-shadow: var(--su-sh2);
+    }
+    .su-mock-h {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: var(--su-2); border-bottom: 1px solid var(--su-line);
+    }
+    .su-mock-h b { font-size: 12.5px; font-weight: 700; letter-spacing: -0.015em; color: var(--su-ink); }
+    .su-mock-h span { font-size: 10.5px; color: var(--su-faint); font-weight: 600; }
+    .su-mrow { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--su-line); }
+    .su-mrow:last-child { border-bottom: 0; padding-bottom: 0; }
+    .su-mrow p { font-size: 12px; font-weight: 500; line-height: 1.4; color: var(--su-ink); }
+    .su-time {
+      background: var(--su-red-soft); color: var(--su-red-ink); font-size: 10px; font-weight: 700;
+      padding: 3px 7px; border-radius: 6px; flex: 0 0 auto; font-variant-numeric: tabular-nums;
+    }
+    .su-ready {
+      display: inline-flex; align-items: center; gap: 6px; background: var(--su-grn-soft);
+      color: var(--su-grn); font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 3px 9px; border-radius: 99px;
+    }
+    .su-ready i { width: 5px; height: 5px; border-radius: 50%; background: var(--su-grn); display: block; }
+
+    .su-facts { margin-top: auto; padding-top: var(--su-6); display: grid; gap: var(--su-3); }
+    .su-facts li { display: grid; grid-template-columns: 26px 1fr; gap: 11px; align-items: start; }
+    .su-facts .su-ic {
+      width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--su-card); border: 1px solid var(--su-line);
+    }
+    .su-facts .su-ic svg { width: 12px; height: 12px; fill: var(--su-mid); }
+    .su-facts .su-ic.hot svg { fill: var(--su-red-ink); }
+    .su-facts span { font-size: 12px; line-height: 1.5; color: var(--su-mid); padding-top: 4px; }
+    .su-facts b { color: var(--su-ink); font-weight: 700; }
+
+    /* what onboarding actually detects — no more, so the list stays honest */
+    .su-provs { display: grid; gap: var(--su-1); }
+    .su-prov {
+      display: flex; align-items: center; gap: 11px; background: var(--su-card);
+      border: 1px solid var(--su-line); border-radius: 12px; padding: 11px 13px;
+    }
+    .su-pi {
+      width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: 0 0 auto;
+      font-size: 12px; font-weight: 800; letter-spacing: -0.04em;
+      background: var(--su-red-soft); color: var(--su-red-ink);
+    }
+    .su-prov b { font-size: 12.5px; font-weight: 700; letter-spacing: -0.015em; color: var(--su-ink); }
+    .su-prov code {
+      margin-left: auto; font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 10.5px; color: var(--su-faint);
+    }
+    .su-pnote { margin-top: var(--su-3); font-size: 11.5px; color: var(--su-faint); line-height: 1.5; }
+
+    /* ---- form column ---- */
+    .su-form {
+      padding: var(--su-7) var(--su-8) 30px;
+      display: flex; flex-direction: column; min-width: 0; background: var(--su-bg);
+    }
+
+    /* progress — three segments, because there are three tasks. Each screen
+       carries its own, already in the right state; nothing to update. */
+    .setup-prog { display: flex; align-items: center; gap: 5px; }
+    .setup-prog i { height: 5px; width: 34px; border-radius: 99px; background: var(--su-line2); display: block; }
+    .setup-prog i.on { background: var(--su-red); }
+    .setup-prog span {
+      margin-left: 7px; font-size: 11.5px; font-weight: 600; color: var(--su-faint);
+    }
+
+    .setup-h {
+      margin-top: var(--su-7);
+      font-size: 30px; font-weight: 800; letter-spacing: -0.032em; line-height: 1.14;
+      color: var(--su-ink); max-width: 18ch; text-wrap: balance;
+    }
+    .setup-lead {
+      margin-top: var(--su-3);
+      font-size: 14.5px; font-weight: 500; color: var(--su-mid); line-height: 1.6; max-width: 48ch;
+    }
+
+    /* the question's answers. The pill recommends; the card stays neutral,
+       so the two options read as equally available. */
+    .su-choices { display: grid; gap: var(--su-2); margin-top: var(--su-6); }
+    .su-choice {
+      position: relative; display: flex; align-items: center; gap: 14px; width: 100%;
+      text-align: left; padding: 16px; border-radius: 16px; cursor: pointer;
+      background: var(--su-card); border: 1px solid var(--su-line);
+      box-shadow: var(--su-sh1); color: inherit; font-family: inherit;
+      transition: border-color 0.16s ease, transform 0.16s ease;
+    }
+    .su-choice:hover { border-color: var(--su-line2); transform: translateY(-1px); }
+    .su-c-tile {
+      width: 40px; height: 40px; border-radius: 12px; flex: 0 0 auto;
+      display: grid; place-items: center; background: var(--su-well);
+    }
+    .su-c-tile svg { width: 17px; height: 17px; fill: var(--su-mid); }
+    .su-c-tile.hot svg { fill: var(--su-red-ink); }
+    .su-choice .su-c-body { flex: 1 1 auto; min-width: 0; }
+    .su-choice .su-c-h { display: block; font-size: 15px; font-weight: 700; letter-spacing: -0.018em; color: var(--su-ink); }
+    .su-choice .su-c-s { display: block; font-size: 12.5px; color: var(--su-mid); margin-top: 4px; line-height: 1.45; font-weight: 500; }
+    .su-c-go { flex: 0 0 auto; display: flex; color: var(--su-faint); }
+    .su-c-go svg { width: 16px; height: 16px; }
+    .su-rec {
+      position: absolute; top: -8px; right: 16px;
+      font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+      color: var(--su-on-red); background: var(--su-red); border-radius: 99px; padding: 3px 9px;
+    }
+
+    /* the billing caveat is information, not a warning — so it is grey */
+    .su-quiet {
+      margin-top: var(--su-4); background: var(--su-well); border: 1px solid var(--su-line);
+      border-radius: 12px; padding: 13px 15px; display: flex; gap: 11px;
+    }
+    .su-quiet svg { width: 14px; height: 14px; fill: var(--su-faint); flex: 0 0 auto; margin-top: 2px; }
+    .su-quiet p { font-size: 12px; line-height: 1.55; color: var(--su-mid); font-weight: 500; }
+
+    .su-foot { margin-top: var(--su-4); font-size: 12px; color: var(--su-faint); line-height: 1.55; font-weight: 500; }
+    .su-links { margin-top: auto; padding-top: var(--su-5); display: flex; gap: var(--su-4); align-items: center; flex-wrap: wrap; }
+    .su-link {
+      background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+      font-size: 12.5px; font-weight: 600; color: var(--su-red-ink);
+      border-bottom: 1.5px solid var(--su-red-line); line-height: 1.4;
+    }
+    .su-link:hover { border-bottom-color: var(--su-red-ink); }
+    .su-link.mut { color: var(--su-faint); border-bottom-color: transparent; }
+    .su-link.mut:hover { color: var(--su-mid); }
+
+    .su-drawer {
+      margin-top: var(--su-3); padding: 14px 16px; border-radius: 12px;
+      background: var(--su-well); border: 1px solid var(--su-line);
+      font-size: 12.5px; color: var(--su-mid); line-height: 1.6; font-weight: 500;
+    }
+    .su-drawer p + p { margin-top: 9px; }
+    .su-drawer b { color: var(--su-ink); font-weight: 700; }
+
+    /* ---- step 2: one numbered path, 1 -> 4, crossing the divider twice ---- */
+    .su-stepblock { margin-top: var(--su-5); display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; align-items: start; }
+    .su-stepblock h5 { font-size: 13.5px; font-weight: 700; letter-spacing: -0.015em; color: var(--su-ink); margin-bottom: var(--su-2); padding-top: 3px; }
+    .su-sn {
+      width: 20px; height: 20px; border-radius: 50%; background: var(--su-red); color: var(--su-on-red);
+      font-size: 11px; font-weight: 700; display: grid; place-items: center; flex: 0 0 auto;
+    }
+    .su-sn.lg { width: 26px; height: 26px; font-size: 13px; }
+    /* On the bring-your-own branch there is no errand to sequence, so the
+       numbers and the path that joins them are not drawn at all. */
+    .setup-screen[data-branch="existing"] .su-only-gem { display: none !important; }
+    .setup-screen[data-branch="gemini"] .su-only-byo { display: none !important; }
+    /* Without a number beside it, the block is just a block — otherwise the
+       field stays squeezed into the 26px column the badge left behind. */
+    .setup-screen[data-branch="existing"] .su-stepblock { display: block; }
+
+    .su-brow {
+      display: flex; align-items: center; gap: 10px; background: var(--su-card);
+      border: 1px solid var(--su-line); border-radius: 14px; padding: 10px 12px; box-shadow: var(--su-sh2);
+    }
+    .su-brow i { width: 7px; height: 7px; border-radius: 50%; background: var(--su-line2); display: block; }
+    .su-brow .u {
+      background: var(--su-well); border-radius: 8px; padding: 5px 11px;
+      font-size: 11px; color: var(--su-mid); font-weight: 600; flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .su-stepcard {
+      background: var(--su-card); border: 1px solid var(--su-line); border-radius: 16px;
+      padding: 14px; margin-top: var(--su-2); box-shadow: var(--su-sh2);
+    }
+    .su-sl { display: flex; align-items: center; gap: 11px; padding: var(--su-1) 0; }
+    .su-sl p { font-size: 12px; font-weight: 500; color: var(--su-mid); }
+    .su-sl-sub { padding: 0 0 var(--su-1) 31px; }
+    /* Drawn to match the real control on aistudio.google.com — recognition is
+       the whole point of the preview. */
+    .su-gbtn {
+      display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--su-line2);
+      background: var(--su-well); border-radius: 8px; padding: 5px 10px;
+      font-size: 11.5px; font-weight: 600; color: var(--su-ink); white-space: nowrap;
+    }
+    .su-gbtn svg { width: 12px; height: 12px; fill: var(--su-yel-ink); }
+    .su-gkey {
+      margin-left: auto; background: var(--su-yel-soft); border-radius: 7px; padding: 5px 9px;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace; font-size: 10.5px;
+      color: var(--su-yel-ink); font-weight: 600; letter-spacing: -0.03em;
+      max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* The path is measured from the real boxes at draw time, so it keeps
+       pointing at the card however the text reflows. */
+    .su-guide { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+    .su-guide path { fill: none; stroke: var(--su-red-ink); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 2 6; opacity: 0.9; }
+    .su-guide polyline { fill: none; stroke: var(--su-red-ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ---- the key field and everything it can say back ---- */
+    .su-field { display: flex; gap: 10px; margin-top: var(--su-4); }
+    .su-2 .su-stepblock .su-field { margin-top: 0; }
+    .su-field input {
+      flex: 1; min-width: 0; font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 12.5px; padding: 13px 15px; border-radius: 12px; color: var(--su-ink);
+      border: 1px solid var(--su-line2); background: var(--su-well);
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    .su-field input:focus {
+      outline: none; border-color: var(--su-red); background: var(--su-card);
+      box-shadow: 0 0 0 3px var(--su-red-soft);
+    }
+    .su-field input::placeholder { color: var(--su-faint); }
+    .su-hint { margin-top: var(--su-2); font-size: 12px; color: var(--su-mid); font-weight: 500; line-height: 1.5; }
+    .su-hint code {
+      background: var(--su-yel-soft); color: var(--su-yel-ink); border-radius: 5px; padding: 1.5px 5px;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace; font-size: 11px; font-weight: 600;
+    }
+    .su-hint.ok { color: var(--su-grn); font-weight: 600; }
+    .su-hint.bad { color: var(--su-err); font-weight: 600; }
+
+    /* Asked only when a pasted key matches no shape we know, so the flow never
+       guesses a provider and then blames the user's key for the mismatch. */
+    .su-pick { margin-top: var(--su-4); }
+    .su-pick p { font-size: 12.5px; color: var(--su-mid); margin-bottom: var(--su-2); font-weight: 500; }
+    .su-pick-row { display: flex; gap: var(--su-1); flex-wrap: wrap; }
+    .su-pick-row button {
+      font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+      padding: 7px 14px; border-radius: 99px; color: var(--su-ink);
+      background: var(--su-card); border: 1px solid var(--su-line2);
+    }
+    .su-pick-row button:hover { border-color: var(--su-red-line); }
+
+    /* a rejection explains itself and stays explained; nothing resets */
+    .su-error {
+      margin-top: var(--su-3); padding: 14px 16px; border-radius: 14px;
+      background: var(--su-err-bg); border: 1px solid var(--su-err-ln);
+    }
+    .su-error h4 { font-size: 13.5px; font-weight: 700; color: var(--su-err); letter-spacing: -0.01em; }
+    .su-error p { font-size: 12px; color: var(--su-err); opacity: 0.86; line-height: 1.55; margin-top: 6px; font-weight: 500; }
+    .su-error ul { margin-top: var(--su-1); display: grid; gap: 3px; }
+    .su-error li {
+      font-size: 12px; color: var(--su-err); opacity: 0.86; line-height: 1.6;
+      padding-left: 14px; position: relative; font-weight: 500;
+    }
+    .su-error li::before { content: ''; position: absolute; left: 0; top: 9px; width: 6px; height: 1.5px; background: currentColor; }
+
+    .su-row { display: flex; gap: 11px; align-items: center; flex-wrap: wrap; margin-top: var(--su-5); }
+    .su-row .note { font-size: 12px; color: var(--su-faint); font-weight: 500; }
+    .su-btn {
+      font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em;
+      border-radius: 12px; padding: 13px 20px; border: 1px solid transparent; cursor: pointer;
+      background: var(--su-red); color: var(--su-on-red); box-shadow: var(--su-shbtn);
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: filter 0.16s ease, background 0.16s ease;
+    }
+    .su-btn:hover { filter: brightness(1.08); }
+    .su-btn:disabled { background: var(--su-line); color: var(--su-faint); box-shadow: none; cursor: default; }
+    .su-btn.sec {
+      background: var(--su-card); border-color: var(--su-line2); color: var(--su-ink); box-shadow: var(--su-sh1);
+    }
+    .su-btn.sec:hover { filter: none; border-color: var(--su-faint); }
+
+    /* ---- the finish ----
+       Two minutes of someone's attention were spent getting here, so arriving
+       is a moment rather than a state change: the badge lands, a ring leaves
+       past it, the tick draws itself, confetti is thrown from behind the badge
+       and settles where it falls, the first summary arrives in the panel, and
+       the words follow once the noise is over. About a second and a half, then
+       completely still.
+
+       Everything rests in its finished state, so when the sequence is switched
+       off the screen is simply correct and quiet rather than empty. */
+    .su-celebrate { position: relative; height: 116px; display: grid; place-items: center; margin-top: var(--su-3); }
+    .su-burst {
+      position: absolute; width: 210px; height: 210px; border-radius: 50%;
+      background: radial-gradient(circle, var(--su-red-soft) 0%, transparent 68%);
+    }
+    .su-rings { position: absolute; inset: 0; display: grid; place-items: center; }
+    .su-rings i {
+      position: absolute; display: block; border-radius: 50%;
+      border: 1.5px solid var(--su-red-line); opacity: var(--su-o);
+    }
+    .su-rings i:nth-child(1) { width: 94px; height: 94px; --su-o: 0.8; }
+    .su-rings i:nth-child(2) { width: 136px; height: 136px; --su-o: 0.42; }
+    .su-rings i:nth-child(3) { width: 186px; height: 186px; --su-o: 0.2; }
+    /* the one that does not stay */
+    .su-pulse {
+      position: absolute; width: 94px; height: 94px; border-radius: 50%;
+      border: 2px solid var(--su-red); opacity: 0;
+    }
+    .su-confetti { position: absolute; inset: -24px -40px; overflow: hidden; }
+    .su-confetti i {
+      position: absolute; display: block; border-radius: 2px;
+      opacity: 0.88; transform: rotate(var(--su-r, 0deg));
+    }
+    .su-confetti i.dot { border-radius: 50%; }
+    .su-tick {
+      position: relative; z-index: 2; width: 60px; height: 60px; border-radius: 50%;
+      background: var(--su-red); display: grid; place-items: center; box-shadow: var(--su-shbtn);
+    }
+    .su-tick svg { width: 27px; height: 27px; overflow: visible; }
+    .su-tick-path {
+      fill: none; stroke: #fff; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 30; stroke-dashoffset: 0;
+    }
+
+    /* The sequence runs only while screen three is the screen you are on, so
+       stepping back and finishing again plays it again. */
+    .su-3.active .su-tick { animation: suPop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) 0.06s both; }
+    .su-3.active .su-tick-path { animation: suDraw 0.36s cubic-bezier(0.65, 0, 0.35, 1) 0.3s both; }
+    .su-3.active .su-rings i { animation: suRingIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .su-3.active .su-rings i:nth-child(1) { animation-delay: 0.16s; }
+    .su-3.active .su-rings i:nth-child(2) { animation-delay: 0.24s; }
+    .su-3.active .su-rings i:nth-child(3) { animation-delay: 0.32s; }
+    .su-3.active .su-pulse { animation: suPulse 0.85s cubic-bezier(0.16, 0.8, 0.3, 1) 0.2s both; }
+    .su-3.active .su-confetti i {
+      animation: suThrow 0.9s cubic-bezier(0.18, 0.9, 0.28, 1) both;
+      animation-delay: var(--su-t, 0.34s);
+    }
+    .su-3.active .su-rise { animation: suRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--su-d, 0s); }
+    /* the first summary arriving, line by line */
+    .su-3.active .su-mock .su-mrow { animation: suRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .su-3.active .su-mock .su-mrow:nth-child(2) { animation-delay: 0.26s; }
+    .su-3.active .su-mock .su-mrow:nth-child(3) { animation-delay: 0.36s; }
+    .su-3.active .su-mock .su-mrow:nth-child(4) { animation-delay: 0.46s; }
+    .su-3.active .su-ready { animation: suPop 0.45s cubic-bezier(0.22, 1.4, 0.36, 1) 0.6s both; }
+    .su-3.active .su-chip::before { animation: suDot 1.4s ease-out 1.05s 2; }
+
+    /* Nothing on this screen may depend on an animation to become visible. If
+       the tab was in the background when the key came back, the frames never
+       ran; a moment later the sequence is called off and the finished screen
+       is simply there. */
+    .su-3.su-settled *, .su-3.su-settled *::before { animation: none !important; }
+    .su-3.su-settled .su-pulse { display: none; }
+
+    @keyframes suPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes suDraw { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+    @keyframes suRingIn { from { transform: scale(0.55); opacity: 0; } to { transform: scale(1); opacity: var(--su-o); } }
+    @keyframes suPulse { from { transform: scale(0.5); opacity: 0.5; } to { transform: scale(2.4); opacity: 0; } }
+    /* thrown from behind the badge, overshooting once before it settles */
+    @keyframes suThrow {
+      0%   { transform: translate(var(--su-sx), var(--su-sy)) scale(0.2) rotate(0deg); opacity: 0; }
+      12%  { opacity: 1; }
+      62%  { transform: translate(0, -9px) scale(1.07) rotate(calc(var(--su-r) * 1.3)); opacity: 1; }
+      100% { transform: translate(0, 0) scale(1) rotate(var(--su-r)); opacity: 0.88; }
+    }
+    @keyframes suRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes suDot {
+      0%, 100% { box-shadow: 0 0 0 3px var(--su-grn-soft); }
+      35%      { box-shadow: 0 0 0 9px transparent; }
+    }
+
+    .su-chip-row { margin-top: var(--su-3); }
+    .su-chip {
+      display: inline-flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700;
+      letter-spacing: -0.01em; color: var(--su-ink); background: var(--su-card);
+      border: 1px solid var(--su-line2); border-radius: 999px; padding: 9px 16px; box-shadow: var(--su-sh1);
+    }
+    .su-chip::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--su-grn);
+      box-shadow: 0 0 0 3px var(--su-grn-soft); flex: 0 0 auto;
+    }
+    /* The two-minute promise on screen one, answered with the real number. */
+    .su-stat {
+      margin-top: var(--su-3); font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--su-faint);
+    }
+    .su-stat b { color: var(--su-red-ink); font-weight: 600; }
+    .su-3 .setup-h { margin-top: var(--su-5); font-size: 36px; max-width: none; }
+    .su-3 .setup-lead { margin-top: var(--su-3); }
+    /* only the form's list; the panel's still anchors to the bottom */
+    .su-3 .su-form .su-facts { padding-top: var(--su-4); margin-top: var(--su-4); }
+    .su-3 .su-row { margin-top: auto; padding-top: var(--su-5); }
+
+    @media (max-width: 900px) {
+      .setup-screen.active { grid-template-columns: 1fr; min-height: 0; }
+      .su-panel { border-right: 0; border-bottom: 1px solid var(--su-line); padding: var(--su-6) var(--su-5); }
+      .su-form { padding: var(--su-6) var(--su-5) var(--su-5); }
+      .su-facts { margin-top: var(--su-5); }
+      /* stacked, the switch sits over the panel's own header row */
+      .su-brand { padding-right: 76px; }
+      .setup-h { font-size: 26px; }
+      .su-guide { display: none; }
+      .su-theme { top: 14px; right: 14px; }
+    }
+    /* Resting states above are the finished states, so switching the sequence
+       off leaves the screen correct rather than blank. */
+    @media (prefers-reduced-motion: reduce) {
+      .setup, .setup *, .setup *::before { animation: none !important; transition: none !important; }
+      .su-pulse { display: none; }
+    }
+
+    /* ==================================================================
+       Custom provider — a settings sheet, not a stack of inputs.
+       Sectioned, label-left, with the endpoint resolving under itself and
+       models as chips, because a comma-separated string is a data format,
+       not an interface. Shares the Daylight tokens above, so it matches
+       whatever is behind it: first-run, or the settings page.
+       ================================================================== */
+    .modal-content.cp-mode { max-width: 640px; background: var(--su-card); border-color: var(--su-line); }
+    .cp-mode .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--su-line); align-items: flex-start; }
+    .cp-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .cp-titles { min-width: 0; }
+    #provider-config-subtitle { font-size: 12px; color: #71717a; margin-top: 4px; }
+    .cp-mode .modal-header h3 { font-size: 17px; font-weight: 800; letter-spacing: -0.03em; color: var(--su-ink); line-height: 1.3; }
+    .cp-mode #provider-config-subtitle { color: var(--su-mid) !important; font-size: 12px; margin-top: 2px !important; line-height: 1.4; }
+    .cp-mode .close-modal { color: var(--su-faint); border-radius: 8px; width: 28px; height: 28px; }
+    .cp-mode .close-modal:hover { background: var(--su-well); color: var(--su-ink); }
+    .cp-icon {
+      width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+      display: grid; place-items: center; background: var(--su-red-soft);
+    }
+    .cp-icon svg { width: 16px; height: 16px; fill: var(--su-red-ink); }
+    .cp-mode .modal-body { padding: 0; gap: 0; display: block; }
+
+    .cp-body {
+      padding: 2px 20px 8px;
+      max-height: min(72vh, 540px); overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: var(--su-line2) transparent;
+    }
+    /* The default bar is a slab of chrome in the middle of a designed sheet. */
+    .cp-body::-webkit-scrollbar { width: 12px; }
+    .cp-body::-webkit-scrollbar-track { background: transparent; }
+    .cp-body::-webkit-scrollbar-thumb {
+      background-color: var(--su-line2); border-radius: 99px;
+      border: 4px solid var(--su-card); background-clip: padding-box;
+    }
+    .cp-body::-webkit-scrollbar-thumb:hover { background-color: var(--su-faint); }
+
+    .cp-sec {
+      display: flex; align-items: center; gap: 11px;
+      padding: var(--su-4) 0 var(--su-2);
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--su-faint);
+    }
+    .cp-sec::after { content: ''; flex: 1; height: 1px; background: var(--su-line); }
+    .cp-fr {
+      display: grid; grid-template-columns: 168px minmax(0, 1fr);
+      gap: 5px 16px; align-items: center; padding: 6px 0;
+    }
+    /* Label and its badge on one line: the badge is the answer to "do I have
+       to fill this in", which is a property of the label, not a second row. */
+    .cp-lb { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .cp-lb label { font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; color: var(--su-ink); cursor: default; }
+    .cp-lb em {
+      font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em;
+      padding: 2px 7px; border-radius: 99px;
+      background: var(--su-red-soft); color: var(--su-red-ink);
+    }
+    .cp-lb em.opt { background: var(--su-well); color: var(--su-faint); box-shadow: inset 0 0 0 1px var(--su-line); }
+    .cp-in {
+      display: flex; align-items: center; min-width: 0;
+      background: var(--su-well); border: 1px solid var(--su-line2); border-radius: 10px;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    .cp-in:focus-within { border-color: var(--su-red); background: var(--su-card); box-shadow: 0 0 0 3px var(--su-red-soft); }
+    .cp-in input {
+      flex: 1; min-width: 0; background: none; border: 0; outline: none;
+      padding: 10px 12px; color: var(--su-ink); font-size: 12.5px;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+    }
+    .cp-in input::placeholder { color: var(--su-faint); }
+    .cp-in .toggle-visibility { position: static; margin-right: 5px; color: var(--su-faint); }
+    .cp-in .toggle-visibility:hover { color: var(--su-ink); background: var(--su-line); }
+    .cp-fr.cp-bad .cp-in, .cp-fr.cp-bad .cp-tags { border-color: var(--su-red); box-shadow: 0 0 0 3px var(--su-red-soft); }
+
+    .cp-help, .cp-subnote { grid-column: 2; font-size: 11px; color: var(--su-faint); line-height: 1.45; padding-top: 1px; }
+
+    /* What the endpoint resolves to, said out loud before anything is saved. */
+    .cp-resolve {
+      grid-column: 2; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 10.5px; color: var(--su-mid); padding-top: 1px;
+    }
+    /* display:flex above outranks the hidden attribute's display:none, which
+       left a bare POST chip sitting under an empty field. */
+    .cp-resolve[hidden] { display: none !important; }
+    .cp-resolve .m {
+      background: var(--su-well); box-shadow: inset 0 0 0 1px var(--su-line); border-radius: 5px;
+      padding: 1px 6px; color: var(--su-faint); font-weight: 600; letter-spacing: 0.06em;
+    }
+    .cp-resolve b { font-weight: 600; letter-spacing: 0.04em; color: var(--su-grn); }
+    .cp-resolve b.bad { color: var(--su-err); }
+
+    .cp-tags {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      background: var(--su-well); border: 1px solid var(--su-line2); border-radius: 10px; padding: 6px 7px;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    .cp-tags:focus-within { border-color: var(--su-red); background: var(--su-card); box-shadow: 0 0 0 3px var(--su-red-soft); }
+    .cp-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--su-red-soft); color: var(--su-red-ink); border-radius: 7px;
+      padding: 4px 5px 4px 9px;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace; font-size: 11.5px; font-weight: 500;
+    }
+    .cp-tag.first { box-shadow: inset 0 0 0 1px var(--su-red-line); }
+    .cp-tag button {
+      background: none; border: 0; padding: 0 2px; cursor: pointer; line-height: 1;
+      color: inherit; opacity: 0.55; font-size: 13px; font-family: inherit;
+    }
+    .cp-tag button:hover { opacity: 1; }
+    .cp-tags input {
+      flex: 1 1 110px; min-width: 84px; background: none; border: 0; outline: none;
+      color: var(--su-ink); font-size: 12px; padding: 4px 3px;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+    }
+    .cp-tags input::placeholder { color: var(--su-faint); }
+
+    /* Headers are for the one person in a hundred who needs them, so they do
+       not get to make the sheet longer for everyone else. */
+    .cp-disc {
+      display: flex; align-items: center; gap: 9px; width: 100%;
+      margin-top: var(--su-4); padding: 12px 0; cursor: pointer;
+      background: none; border: 0; border-top: 1px solid var(--su-line);
+      font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--su-mid); text-align: left;
+    }
+    .cp-disc:hover { color: var(--su-ink); }
+    .cp-disc svg { width: 11px; height: 11px; fill: var(--su-faint); transition: transform 0.18s ease; }
+    .cp-disc[aria-expanded="true"] svg { transform: rotate(90deg); }
+    .cp-disc .n { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--su-faint); }
+    .cp-disc[aria-expanded="true"] .n { opacity: 0; }
+    .cp-advanced { padding-bottom: var(--su-2); }
+
+    .cp-foot {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 14px 20px; border-top: 1px solid var(--su-line); background: var(--su-well);
+    }
+    .cp-shield { display: flex; align-items: flex-start; gap: 9px; flex: 1 1 220px; min-width: 0; }
+    .cp-shield svg { width: 14px; height: 14px; fill: var(--su-faint); flex: 0 0 auto; margin-top: 1px; }
+    .cp-shield span { font-size: 11.5px; line-height: 1.45; color: var(--su-mid); font-weight: 500; max-width: 46ch; }
+    .cp-shield b { color: var(--su-ink); font-weight: 600; }
+    .cp-btns { display: flex; gap: 9px; flex: 0 0 auto; margin-left: auto; }
+    .cp-btns .su-btn { padding: 10px 17px; font-size: 13px; border-radius: 10px; }
+
+    @media (max-width: 560px) {
+      .cp-fr { grid-template-columns: 1fr; }
+      .cp-resolve, .cp-subnote { grid-column: 1; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- ======================================================================
+       First-run setup. Shown in place of .app when the flow is requested
+       (#setup, or the panel's "Set up" button). Three screens, one question
+       each; the right column previews the panel and never asks anything.
+       ====================================================================== -->
+  <div class="setup" id="setup-view" hidden>
+    <div class="setup-card">
+
+      <!-- Dark is the default, because the rest of settings is dark. The
+           choice is remembered, and only ever applies while first run is on
+           screen, so the provider sheet always matches what is behind it. -->
+      <div class="su-theme" id="su-theme" role="group" aria-label="Appearance">
+        <button type="button" data-mode="dark" aria-pressed="true" title="Dark" aria-label="Dark">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36A5.5 5.5 0 0 1 12.4 3.1c-.13 0-.26-.1-.4-.1z"/></svg>
+        </button>
+        <button type="button" data-mode="light" aria-pressed="false" title="Light" aria-label="Light">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1zm0 17a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0v-2a1 1 0 0 1 1-1zM2 12a1 1 0 0 1 1-1h2a1 1 0 1 1 0 2H3a1 1 0 0 1-1-1zm17 0a1 1 0 0 1 1-1h2a1 1 0 1 1 0 2h-2a1 1 0 0 1-1-1zM4.9 4.9a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 1-1.4 1.4L4.9 6.3a1 1 0 0 1 0-1.4zm11.4 11.4a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 1-1.4 1.4l-1.4-1.4a1 1 0 0 1 0-1.4zm2.8-11.4a1 1 0 0 1 0 1.4l-1.4 1.4a1 1 0 1 1-1.4-1.4l1.4-1.4a1 1 0 0 1 1.4 0zM7.7 16.3a1 1 0 0 1 0 1.4l-1.4 1.4a1 1 0 0 1-1.4-1.4l1.4-1.4a1 1 0 0 1 1.4 0z"/></svg>
+        </button>
+      </div>
+
+      <!-- 1 · choose an AI ------------------------------------------------ -->
+      <section class="setup-screen su-1 active" data-screen="1">
+        <aside class="su-panel">
+          <div class="su-brand">
+            <span class="su-mk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
+            <div><b>Timestamped Summary</b><span>for YouTube</span></div>
+          </div>
+          <p class="su-pcap">What you get on every video</p>
+          <div class="su-mock" aria-hidden="true">
+            <div class="su-mock-h"><b>Summary</b><span>42 points · 6 min read</span></div>
+            <div class="su-mrow"><span class="su-time">0:42</span><p>Transforming Electrons to Tokens</p></div>
+            <div class="su-mrow"><span class="su-time">1:46</span><p>Nvidia's Core Philosophy</p></div>
+            <div class="su-mrow"><span class="su-time">12:03</span><p>Why Inference Costs Collapse</p></div>
+          </div>
+          <ul class="su-facts">
+            <li><span class="su-ic hot"><svg viewBox="0 0 24 24"><path d="M20 7h-2.2A3 3 0 0 0 12 4.2 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h9V7h-1a1 1 0 1 1 1-1zM4 12v7a1 1 0 0 0 1 1h6v-8H4zm9 8h6a1 1 0 0 0 1-1v-7h-7v8zm8-13a1 1 0 0 1 0 2h-8V8a1 1 0 1 1 1-1h7z"/></svg></span><span><b>Free</b> — no card, no billing setup, nothing to cancel.</span></li>
+            <li><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M17 9V7a5 5 0 0 0-10 0v2H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1zM9 7a3 3 0 0 1 6 0v2H9V7zm4 8.7V17a1 1 0 1 1-2 0v-1.3a1.8 1.8 0 1 1 2 0z"/></svg></span><span>The key <b>stays on this computer</b>. It isn't sent to us — there is no “us”.</span></li>
+            <li><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.4V7a1 1 0 1 0-2 0v6a1 1 0 0 0 .5.87l3.5 2a1 1 0 1 0 1-1.74L13 12.4z"/></svg></span><span>About <b>two minutes</b>, and you never do it again.</span></li>
+          </ul>
+        </aside>
+
+        <div class="su-form">
+          <div class="setup-prog"><i class="on"></i><i></i><i></i><span>Step 1 of 3</span></div>
+          <h2 class="setup-h">Choose an AI to write your summaries</h2>
+          <p class="setup-lead">This extension reads a video's captions, but it doesn't write the summary itself. It hands the transcript to an AI of your choosing. Google's is free.</p>
+
+          <div class="su-choices">
+            <button type="button" class="su-choice" data-choice="gemini">
+              <span class="su-rec">Recommended</span>
+              <span class="su-c-tile hot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-2.2A3 3 0 0 0 12 4.2 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h9V7h-1a1 1 0 1 1 1-1zM4 12v7a1 1 0 0 0 1 1h6v-8H4zm9 8h6a1 1 0 0 0 1-1v-7h-7v8zm8-13a1 1 0 0 1 0 2h-8V8a1 1 0 1 1 1-1h7z"/></svg></span>
+              <span class="su-c-body">
+                <span class="su-c-h">Use the free one</span>
+                <span class="su-c-s">Google Gemini. No card, no bill, about two minutes to set up.</span>
+              </span>
+              <span class="su-c-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="su-choice" data-choice="existing">
+              <span class="su-c-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10h-8.35A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H13l2 2 2-2 2 2 4-4.04L21 10zM7 15c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg></span>
+              <span class="su-c-body">
+                <span class="su-c-h">I already have an API key</span>
+                <span class="su-c-s">From OpenAI, Anthropic, or any other provider — including a model running on your own machine.</span>
+              </span>
+              <span class="su-c-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+          </div>
+
+          <div class="su-quiet">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            <p>A ChatGPT Plus or Claude Pro subscription doesn't include an API key — those are billed separately. If that's all you have, take the free option.</p>
+          </div>
+
+          <div class="su-links">
+            <button type="button" class="su-link" id="su-what-toggle" aria-expanded="false" aria-controls="su-what">What is an API key?</button>
+            <button type="button" class="su-link mut" id="su-skip">Skip for now</button>
+          </div>
+          <div class="su-drawer" id="su-what" hidden>
+            <p>It's a long password that lets this extension use <b>your</b> Google account's AI — and nothing else. Google hands them out free.</p>
+            <p>It is stored in this browser, on this computer. It isn't sent to whoever made this extension; there is no server here for it to go to. Delete it whenever you like and summaries simply stop.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 · fetch and paste the key -------------------------------------- -->
+      <section class="setup-screen su-2" data-screen="2" data-branch="gemini">
+        <aside class="su-panel">
+          <div class="su-brand su-only-gem">
+            <span class="su-mk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10h-8.35A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H13l2 2 2-2 2 2 4-4.04L21 10zM7 15c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg></span>
+            <div><b>Google AI Studio</b><span>opens in a new tab</span></div>
+          </div>
+          <div class="su-brand su-only-byo">
+            <span class="su-mk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10h-8.35A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H13l2 2 2-2 2 2 4-4.04L21 10zM7 15c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg></span>
+            <div><b>Any provider</b><span>we work it out from the key</span></div>
+          </div>
+          <p class="su-pcap su-only-gem">Steps 2 and 3 happen here</p>
+          <p class="su-pcap su-only-byo">Recognised the moment you paste</p>
+
+          <div id="su-ais">
+            <div class="su-brow" aria-hidden="true"><i></i><i></i><i></i><span class="u">aistudio.google.com/apikey</span></div>
+            <div class="su-stepcard">
+              <div class="su-sl"><span class="su-sn">2</span><p>Sign in with your Google account, then click</p></div>
+              <div class="su-sl-sub">
+                <span class="su-gbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10h-8.35A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H13l2 2 2-2 2 2 4-4.04L21 10zM7 15c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>Create API key</span>
+              </div>
+              <div class="su-sl"><span class="su-sn">3</span><p>Copy the line it shows you</p><span class="su-gkey">AIzaSyD————————————</span></div>
+            </div>
+          </div>
+
+          <div class="su-only-byo" id="su-byo">
+            <div class="su-provs">
+              <div class="su-prov"><span class="su-pi">G</span><b>Google Gemini</b><code>AIza…</code></div>
+              <div class="su-prov"><span class="su-pi">O</span><b>OpenAI</b><code>sk-…</code></div>
+              <div class="su-prov"><span class="su-pi">A</span><b>Anthropic</b><code>sk-ant-…</code></div>
+            </div>
+            <p class="su-pnote">Anything else works through a custom endpoint — including a model running on your own machine.</p>
+          </div>
+
+          <ul class="su-facts">
+            <li class="su-only-gem"><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M17 9V7a5 5 0 0 0-10 0v2H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1zM9 7a3 3 0 0 1 6 0v2H9V7zm4 8.7V17a1 1 0 1 1-2 0v-1.3a1.8 1.8 0 1 1 2 0z"/></svg></span><span>No billing, no project setup. <b>Nothing on that page needs filling in.</b></span></li>
+            <li class="su-only-byo"><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M17 9V7a5 5 0 0 0-10 0v2H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1zM9 7a3 3 0 0 1 6 0v2H9V7zm4 8.7V17a1 1 0 1 1-2 0v-1.3a1.8 1.8 0 1 1 2 0z"/></svg></span><span>The key <b>stays on this computer</b>. It isn't sent to us — there is no “us”.</span></li>
+          </ul>
+        </aside>
+
+        <div class="su-form">
+          <div class="setup-prog"><i class="on"></i><i class="on"></i><i></i><span>Step 2 of 3</span></div>
+          <h2 class="setup-h" id="su-s2-title">Get a free key from Google</h2>
+          <p class="setup-lead" id="su-s2-lead">Two clicks in Google AI Studio, then come back to this tab. Nothing on that page needs filling in.</p>
+
+          <div class="su-stepblock su-only-gem" id="su-open-row">
+            <span class="su-sn lg">1</span>
+            <div>
+              <h5>Open Google AI Studio</h5>
+              <button type="button" class="su-btn" id="su-open-studio">Open Google AI Studio</button>
+              <p class="su-hint">Opens in a new tab — this page waits.</p>
+            </div>
+          </div>
+
+          <div class="su-stepblock" id="su-paste-block">
+            <span class="su-sn lg su-only-gem">4</span>
+            <div>
+              <h5 class="su-only-gem">Paste the key here</h5>
+              <div class="su-field">
+                <input type="text" id="su-key" placeholder="Paste your key here" autocomplete="off" spellcheck="false" aria-label="Paste your API key">
+                <button type="button" class="su-btn" id="su-connect" disabled>Connect</button>
+              </div>
+              <p class="su-hint" id="su-key-hint" role="status" aria-live="polite">A Gemini key starts with <code>AIza</code> and runs about 39 characters.</p>
+
+              <div class="su-pick" id="su-pick" hidden>
+                <p>We don't recognise that key's shape. Which provider is it from?</p>
+                <div class="su-pick-row">
+                  <button type="button" data-pick="openai">OpenAI</button>
+                  <button type="button" data-pick="anthropic">Anthropic</button>
+                  <button type="button" data-pick="more">Show all providers</button>
+                </div>
+              </div>
+
+              <div class="su-error" id="su-error" hidden>
+                <h4 id="su-error-title">That key was not accepted.</h4>
+                <p id="su-error-detail">Nothing was saved, and nothing is broken.</p>
+                <ul id="su-error-causes"></ul>
+              </div>
+            </div>
+          </div>
+
+          <p class="su-foot" id="su-custom-row" hidden>Using a provider we haven't named, or a model on your own machine? <button type="button" class="su-link" id="su-custom-link">Set up a custom endpoint</button></p>
+
+          <div class="su-links">
+            <button type="button" class="su-link mut" data-goto="1">← Back</button>
+          </div>
+        </div>
+
+        <!-- Drawn from the real boxes, so the path keeps pointing at the card
+             however the copy reflows. Hidden on the bring-your-own branch,
+             where there is no errand to sequence. -->
+        <svg class="su-guide su-only-gem" id="su-guide" aria-hidden="true" focusable="false"></svg>
+      </section>
+
+      <!-- 3 · done ---------------------------------------------------------- -->
+      <section class="setup-screen su-3" data-screen="3">
+        <aside class="su-panel">
+          <div class="su-brand">
+            <span class="su-mk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
+            <div><b>Timestamped Summary</b><span>ready on every video</span></div>
+          </div>
+          <p class="su-pcap">Your first summary <span class="su-ready"><i></i>Ready</span></p>
+          <div class="su-mock" aria-hidden="true">
+            <div class="su-mock-h"><b>Summary</b><span>42 points · 6 min read</span></div>
+            <div class="su-mrow"><span class="su-time">0:42</span><p>Transforming Electrons to Tokens</p></div>
+            <div class="su-mrow"><span class="su-time">1:46</span><p>Nvidia's Core Philosophy</p></div>
+            <div class="su-mrow"><span class="su-time">12:03</span><p>Why Inference Costs Collapse</p></div>
+          </div>
+          <ul class="su-facts">
+            <li><span class="su-ic hot"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.4V7a1 1 0 1 0-2 0v6a1 1 0 0 0 .5.87l3.5 2a1 1 0 1 0 1-1.74L13 12.4z"/></svg></span><span>Every line is a link. Click <b>1:46</b> and the video jumps there.</span></li>
+          </ul>
+        </aside>
+
+        <div class="su-form">
+          <div class="setup-prog"><i class="on"></i><i class="on"></i><i class="on"></i><span>Done</span></div>
+          <div class="su-celebrate">
+            <span class="su-burst" aria-hidden="true"></span>
+            <div class="su-confetti" id="su-confetti" aria-hidden="true"></div>
+            <span class="su-rings" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="su-pulse" aria-hidden="true"></span>
+            <span class="su-tick">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path class="su-tick-path" d="M5 12.5 10 17.5 19 7"/></svg>
+            </span>
+          </div>
+          <h2 class="setup-h su-rise" style="--su-d: 0.50s" id="su-done-title">You're all set.</h2>
+          <div class="su-chip-row su-rise" style="--su-d: 0.58s"><span class="su-chip" id="su-done-chip">Google Gemini</span></div>
+          <!-- No placeholder time: the only number that ever appears here is the one that was measured. -->
+          <p class="su-stat su-rise" style="--su-d: 0.66s" id="su-stat" hidden>Setup took <b id="su-elapsed"></b> · you never do this again</p>
+          <p class="setup-lead su-rise" style="--su-d: 0.72s" id="su-done-lead">Open any YouTube video with captions and the panel is waiting in the sidebar — no refresh needed.</p>
+          <ul class="su-facts su-rise" style="--su-d: 0.80s">
+            <li><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></span><span>Change the model, the detail level or add a second provider any time from <b>the gear in the panel</b>.</span></li>
+            <li><span class="su-ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></span><span>Already-open YouTube tabs need one refresh; new ones are ready straight away.</span></li>
+          </ul>
+          <div class="su-row su-rise" style="--su-d: 0.88s">
+            <button type="button" class="su-btn" id="su-goto-youtube">Open YouTube and try it</button>
+            <button type="button" class="su-btn sec" id="su-goto-settings">Go to settings</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
   <div class="app">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -1348,38 +2257,64 @@
       
       <!-- Hidden template for custom provider form -->
       <template id="custom-provider-form-template">
-        <div class="input-group">
-          <label for="cp-name">Display Name (Required)</label>
-          <div class="input-wrapper">
-            <input type="text" id="cp-name" placeholder="e.g. DeepSeek or Local LM Studio">
+        <div class="cp-body">
+          <div class="cp-sec">Connection</div>
+          <div class="cp-fr">
+            <div class="cp-lb"><label for="cp-name">Display name</label><em>Required</em></div>
+            <div class="cp-in"><input type="text" id="cp-name" placeholder="DeepSeek" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="cp-fr">
+            <div class="cp-lb"><label for="cp-endpoint">Endpoint</label><em>Required</em></div>
+            <div class="cp-in"><input type="text" id="cp-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions" autocomplete="off" spellcheck="false"></div>
+            <p class="cp-resolve" id="cp-resolve" hidden><span class="m">POST</span><span id="cp-resolve-host"></span><b id="cp-resolve-state"></b></p>
+          </div>
+          <div class="cp-fr">
+            <div class="cp-lb"><label for="cp-api-key">API key</label><em class="opt">Optional</em></div>
+            <div class="cp-in">
+              <input type="password" id="cp-api-key" placeholder="sk-…" autocomplete="off" spellcheck="false">
+              <button type="button" class="toggle-visibility" data-target="cp-api-key" title="Toggle visibility" aria-label="Toggle key visibility">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+              </button>
+            </div>
+            <p class="cp-help">Leave this empty for a model running on your own machine.</p>
+          </div>
+
+          <div class="cp-sec">Models</div>
+          <div class="cp-fr">
+            <div class="cp-lb"><label for="cp-model-input">Available</label><em>Required</em></div>
+            <!-- Chips are the interface; the comma-separated string they keep
+                 in sync is the storage format, and stays where the save
+                 handler already looks for it. -->
+            <div class="cp-tags" id="cp-tags">
+              <input type="text" id="cp-model-input" placeholder="deepseek-chat" autocomplete="off" spellcheck="false" aria-label="Add a model">
+            </div>
+            <p class="cp-subnote">Press Enter or comma to add. The first one is used by default.</p>
+            <input type="hidden" id="cp-models">
+          </div>
+
+          <button type="button" class="cp-disc" id="cp-advanced-toggle" aria-expanded="false" aria-controls="cp-advanced">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7z"/></svg>
+            <span>Advanced</span>
+            <span class="n">Custom headers</span>
+          </button>
+          <div class="cp-advanced" id="cp-advanced" hidden>
+            <div class="cp-fr">
+              <div class="cp-lb"><label for="cp-headers">Custom headers</label><em class="opt">JSON</em></div>
+              <div class="cp-in"><input type="text" id="cp-headers" placeholder='{"HTTP-Referer": "https://my-app.com"}' autocomplete="off" spellcheck="false"></div>
+            </div>
           </div>
         </div>
-        <div class="input-group">
-          <label for="cp-endpoint">Base URL / Endpoint (Required)</label>
-          <div class="input-wrapper">
-            <input type="text" id="cp-endpoint" placeholder="e.g. https://api.deepseek.com/v1/chat/completions">
-          </div>
-        </div>
-        <div class="input-group">
-          <label for="cp-api-key">API Key (Optional for local models)</label>
-          <div class="input-wrapper">
-            <input type="password" id="cp-api-key" placeholder="Your API key" autocomplete="off">
-          </div>
-        </div>
-        <div class="input-group">
-          <label for="cp-models">Models (Comma separated) (Required)</label>
-          <div class="input-wrapper">
-            <input type="text" id="cp-models" placeholder="e.g. deepseek-chat, deepseek-coder">
-          </div>
-        </div>
-        <div class="input-group">
-          <label for="cp-headers">Custom Headers (JSON, Optional)</label>
-          <div class="input-wrapper">
-            <input type="text" id="cp-headers" placeholder='e.g. {"HTTP-Referer": "https://my-app.com"}'>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="save-btn" id="save-custom-provider-btn">Save Provider</button>
+
+        <div class="cp-foot">
+          <p class="cp-shield">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v7c0 5 3.4 8.8 8 10 4.6-1.2 8-5 8-10V5l-8-3zm-1 14-4-4 1.4-1.4L11 13.2l4.6-4.6L17 10l-6 6z"/></svg>
+            <span>Chrome will ask permission to reach <b id="cp-host">that host</b> first.</span>
+          </p>
+          <span class="cp-btns">
+            <button type="button" class="su-btn sec" id="cp-cancel">Cancel</button>
+            <button type="button" class="su-btn" id="save-custom-provider-btn">Save provider</button>
+          </span>
         </div>
       </template>
         <p class="privacy-note">
@@ -1462,7 +2397,7 @@
           </div>
           <div class="about-row">
             <span class="about-row-label">How it works</span>
-            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Gemini, OpenAI, Anthropic, Mistral, or your own endpoint — always with your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
+            <span class="about-row-value">It pulls the video's transcript, sends it to the AI provider you've set up (Gemini, OpenAI, Anthropic, or your own endpoint — always with your own key), and renders the result as expandable sections — each with a timestamp that seeks the player when you click it.</span>
           </div>
           <div class="about-row">
             <span class="about-row-label">Detail &amp; theme</span>
@@ -1478,7 +2413,7 @@
           </div>
           <div class="about-row">
             <span class="about-row-label">Site access</span>
-            <span class="about-row-value">The extension can reach youtube.com and the four built-in provider APIs, and nothing else. Adding a custom provider asks Chrome for access to that one endpoint, and deleting the provider hands it back. Remote endpoints must use https — plain http is allowed only for localhost.</span>
+            <span class="about-row-value">The extension can reach youtube.com and the three built-in provider APIs, and nothing else. Adding a custom provider asks Chrome for access to that one endpoint, and deleting the provider hands it back. Remote endpoints must use https — plain http is allowed only for localhost.</span>
           </div>
         </div>
 
@@ -1527,13 +2462,16 @@
         <!-- Config View -->
         <div class="modal-content" id="provider-config-view" hidden>
           <div class="modal-header">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <button class="close-modal" id="provider-config-back-btn" style="margin-left: -8px;">
+            <div class="cp-head">
+              <button class="close-modal" id="provider-config-back-btn" style="margin-left: -6px;" aria-label="Back">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
               </button>
-              <div>
+              <span class="cp-icon" id="provider-config-icon" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v6H7v3a5 5 0 0 0 4 4.9V22h2v-6.1A5 5 0 0 0 17 11V8h-2V2h-2v6h-2V2H9z"/></svg>
+              </span>
+              <div class="cp-titles">
                 <h3 id="provider-config-title">Configure Provider</h3>
-                <div style="font-size: 12px; color: #71717a; margin-top: 4px;" id="provider-config-subtitle">Enter API details below</div>
+                <div id="provider-config-subtitle">Enter API details below</div>
               </div>
             </div>
             <button class="close-modal" id="close-provider-config-btn">

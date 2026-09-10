@@ -104,7 +104,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === "PREFS_CHANGED") {
         // A key saved on the settings page, an appearance override, or the
         // Detail default changing in another tab. Re-theme, re-skin, and flip
-        // the primary button between "Generate summary" and "Set API keys".
+        // the primary button between "Generate summary" and "Add API key".
         if (typeof applyPanelPrefs === 'function') {
             applyPanelPrefs(request.prefs);
         }

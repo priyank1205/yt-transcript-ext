@@ -30,7 +30,7 @@ YouTube is one of the best libraries on the internet — tutorials, lectures, co
 This extension builds the index. It reads the video's own transcript, sends it to an LLM you choose, and renders the result as a **sectioned outline where every line is a link into the video**. No new tab, no copy-paste, no chatbot to prompt.
 
 > [!NOTE]
-> **You bring the API key.** There is no server, no account and no subscription in between — the extension talks to your provider directly, and you pay them for what you generate. Google Gemini and Mistral both have free tiers that cover casual use.
+> **You bring the API key.** There is no server, no account and no subscription in between — the extension talks to your provider directly, and you pay them for what you generate. Google Gemini has a free tier that covers casual use.
 
 <br>
 
@@ -131,7 +131,7 @@ The panel folds to a single bar and stays out of the way until you want it back.
 | | |
 |---|---|
 | 🌐 **A Chromium browser** | Chrome, Edge, Brave, Arc, Opera, Vivaldi — anything built on Chromium |
-| 🔑 **An API key** | Free to obtain from [Google Gemini](https://aistudio.google.com/apikey) or [Mistral](https://console.mistral.ai/api-keys/) |
+| 🔑 **An API key** | Free to obtain from [Google Gemini](https://aistudio.google.com/apikey) |
 | ⏱️ **About three minutes** | Once, ever |
 
 <br>
@@ -206,7 +206,7 @@ If Chrome shows the error *"Manifest file is missing or unreadable"*, this is wh
 
 </details>
 
-**That's it — the extension is installed.** Its settings page opens automatically on first install. Leave it open; that's Step 3.
+**That's it — the extension is installed.** A short setup guide opens automatically on first install. Leave it open; that's Step 3.
 
 <br>
 
@@ -217,16 +217,16 @@ The extension does not include an AI model. You point it at a provider you have 
 | Provider | Free tier? | Where to get a key | Default model |
 |---|:---:|---|---|
 | **Google Gemini** ⭐ | ✅ Yes — no billing setup needed | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `gemini-flash-lite-latest` |
-| **Mistral AI** | ✅ Free *Experiment* tier (phone verification) | [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys/) | `mistral-large-latest` |
 | **OpenAI** | ❌ Paid | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | `gpt-4o-mini` |
 | **Anthropic** | ❌ Paid | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) | `claude-haiku-4-5-20251001` |
-| **Any OpenAI-compatible endpoint** | — | Your own URL — including a local model | Yours to list |
+| **Any OpenAI-compatible endpoint** | — | Your own URL — Mistral, Groq, DeepSeek, OpenRouter, Together, a local model, anything that speaks the OpenAI chat API | Yours to list |
 
-⭐ **New here? Start with Gemini.** It is free, needs no card, and takes about a minute.
+⭐ **New here? Start with Gemini.** It is free, needs no card, and takes about a minute. Any provider that is not in the table is reached by adding a **custom provider** with its endpoint URL and your key — the setup is the same three fields for all of them.
 
-1. Open the settings page — it opened itself on install. Later, you can reach it from the **⚙ gear icon** in the panel, or by right-clicking the extension's icon in the toolbar and choosing **Options**.
-2. Pick a provider, paste your key, and click **Save**. The settings page lists that provider's available models and picks a sensible default for you.
-3. Configure a second provider if you like. Once two or more are set up, a provider selector appears with an **Auto** option that tries each configured provider in turn if one fails.
+1. The setup guide opened itself on install. If you closed it, every route back leads to the same place: **click the extension's icon** in the toolbar, press **Add API key** in the panel, open the **⚙ gear icon** in the panel, or right-click the toolbar icon and choose **Options**. Until a key is saved, the toolbar icon carries a red **!**.
+2. Answer one question — *where should the writing come from?* — and take **Use the free one** unless you already hold an API key. (A ChatGPT Plus or Claude Pro subscription is not an API key; those are billed separately.) The guide shows you exactly what to click on Google's page before it sends you there.
+3. Paste the key and press **Connect**. You don't have to say which provider it came from: the key's own shape identifies it, and the guide checks it with that provider before saving anything.
+4. Configure a second provider if you like. Once two or more are set up, a provider selector appears with an **Auto** option that tries each configured provider in turn if one fails.
 
 <br>
 
@@ -284,11 +284,11 @@ Click **Remove** on its card in `chrome://extensions`. That deletes your stored 
 </details>
 
 <details>
-<summary><b>"No API key set" / the button says "Set API keys"</b></summary>
+<summary><b>"No API key set" / the button says "Add API key"</b></summary>
 
 <br>
 
-No provider is configured yet. Open settings (⚙ in the panel header, or right-click the toolbar icon → **Options**) and follow [Step 3](#step-3--add-an-api-key). The button flips back to **Generate summary** the moment a key is saved — you don't need to reload anything.
+No provider is configured yet. Press **Add API key** in the panel — it opens the setup guide straight away. The toolbar icon carries a red **!** for as long as this is true, and clicking it offers the same thing. If you got part-way and stopped, the button reads **Finish setting up** and tells you how far you got; it picks up where you left off. Either way the button flips to **Generate summary** the moment a key is saved — you don't need to reload anything.
 
 </details>
 
@@ -531,7 +531,7 @@ Counts scale with the real runtime and are floored — not capped — so a long 
 | Permission | Why it's needed |
 |---|---|
 | `*://*.youtube.com/*` | Read the transcript and render the panel. This is the only site the extension runs on. |
-| `generativelanguage.googleapis.com`, `api.openai.com`, `api.anthropic.com`, `api.mistral.ai` | Call the four built-in providers. Requests only go to the one you configured. |
+| `generativelanguage.googleapis.com`, `api.openai.com`, `api.anthropic.com` | Call the three built-in providers. Requests only go to the one you configured. |
 | `storage` | Keep your key and preferences, in a store closed to page contexts |
 | `scripting` | Read the transcript out of the page on request |
 | *Optional, per custom endpoint* | A custom provider is the one address the extension can't know in advance, so Chrome asks for access to **that host** when you save it — and hands the permission back when you delete it |
@@ -607,7 +607,7 @@ It's stored in your browser's extension storage, which is set to be unreadable f
 
 <br>
 
-Whatever your provider charges for the tokens you use — you're billed by them directly. A transcript is text, and the flash/mini-class models set as defaults are the cheap ones. Gemini's free tier needs no billing setup at all, and Mistral's *Experiment* tier is free after phone verification.
+Whatever your provider charges for the tokens you use — you're billed by them directly. A transcript is text, and the flash/mini-class models set as defaults are the cheap ones. Gemini's free tier needs no billing setup at all.
 
 </details>
 

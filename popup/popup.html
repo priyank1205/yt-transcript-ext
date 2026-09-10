@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Timestamped Summary</title>
+<!--
+  The toolbar popup, in its two states. There is exactly one thing to configure
+  — an API key — so the unconfigured state is a single sentence and a single
+  button, not a checklist. Once a key exists it becomes a small status card:
+  what is being used, how much it has done, and a way into settings.
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 320px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    background: #0d0d0f;
+    color: #fafafa;
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .head { display: flex; align-items: center; gap: 11px; padding: 15px 16px 13px; }
+  .head .t { min-width: 0; }
+  .head .t strong { display: block; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .head .t small { display: block; font-size: 12px; color: #8b8b93; margin-top: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .mark { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; }
+  .mark.warn { background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-weight: 700; font-size: 16px; }
+  .mark.ok { background: rgba(22, 163, 74, 0.15); }
+  .mark.ok::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #4ade80; }
+
+  .rule { height: 1px; background: rgba(255, 255, 255, 0.06); }
+
+  .body { padding: 14px 16px 4px; }
+  .body p { font-size: 13px; color: #a1a1aa; line-height: 1.55; }
+  .body p b { color: #e4e4e7; font-weight: 600; }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .row:last-of-type { border-bottom: 0; }
+  .row .k { font-size: 12.5px; color: #8b8b93; }
+  .row .v { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  select {
+    font-family: inherit; font-size: 12.5px; font-weight: 600; color: #fafafa;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 7px; padding: 5px 9px; cursor: pointer;
+  }
+  select:focus-visible { outline: 2px solid #ef4444; outline-offset: 1px; }
+
+  .primary {
+    display: block; width: calc(100% - 32px); margin: 14px 16px; padding: 10px 14px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    background: #ef4444; color: #fff; border: 0; border-radius: 8px;
+  }
+  .primary:hover { background: #dc2626; }
+  .primary.quiet { background: rgba(255, 255, 255, 0.06); color: #fafafa; }
+  .primary.quiet:hover { background: rgba(255, 255, 255, 0.1); }
+
+  .foot { padding: 0 16px 14px; }
+  .foot .link { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+    font-size: 12px; color: #8b8b93; text-decoration: underline;
+    text-decoration-color: rgba(239, 68, 68, 0.5); text-underline-offset: 3px; }
+  .foot .link:hover { color: #fafafa; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- no key: the one thing there is to do -->
+<div id="view-setup" hidden>
+  <div class="head">
+    <span class="mark warn" aria-hidden="true">!</span>
+    <span class="t">
+      <strong>Not set up yet</strong>
+      <small>Summaries need an API key</small>
+    </span>
+  </div>
+  <div class="rule"></div>
+  <div class="body">
+    <p>This extension doesn't write the summaries itself — it hands the transcript to an AI you choose. <b>Google gives a key away free</b>, and it takes about two minutes.</p>
+  </div>
+  <button type="button" class="primary" id="start-setup">Add API key</button>
+  <div class="foot">
+    <button type="button" class="link" id="open-settings-empty">Open settings instead</button>
+  </div>
+</div>
+
+<!-- key present: what it is using, and how much it has done -->
+<div id="view-ready" hidden>
+  <div class="head">
+    <span class="mark ok" aria-hidden="true"></span>
+    <span class="t">
+      <strong>Ready</strong>
+      <small id="ready-provider">—</small>
+    </span>
+  </div>
+  <div class="rule"></div>
+  <div class="row">
+    <span class="k"><label for="detail">Detail</label></span>
+    <select id="detail">
+      <option value="brief">Brief</option>
+      <option value="standard">Standard</option>
+      <option value="detailed">In-depth</option>
+    </select>
+  </div>
+  <div class="row"><span class="k">Summaries made</span><span class="v" id="stat-count">0</span></div>
+  <div class="row"><span class="k">Time saved</span><span class="v" id="stat-saved">0m</span></div>
+  <button type="button" class="primary quiet" id="open-settings">Open settings</button>
+</div>
+
+<script type="module" src="popup.js"></script>
+</body>
+</html>

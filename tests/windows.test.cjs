@@ -12,7 +12,9 @@ const path = require('node:path');
 // The service worker registers chrome listeners at import time.
 const noop = () => {};
 globalThis.chrome = globalThis.chrome || {
-  runtime: { onInstalled: { addListener: noop }, onMessage: { addListener: noop }, getURL: (p) => p, lastError: null },
+  runtime: { onInstalled: { addListener: noop }, onStartup: { addListener: noop },
+             onMessage: { addListener: noop }, getURL: (p) => p, lastError: null },
+  action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
   storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener: noop } },
   tabs: { create: noop, sendMessage: async () => {}, onUpdated: { addListener: noop }, onRemoved: { addListener: noop } },
   webNavigation: { onHistoryStateUpdated: { addListener: noop } }

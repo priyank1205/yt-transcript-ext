@@ -843,36 +843,6 @@
   box-shadow: var(--q-pop-shadow);
 }
 
-/* --- First-run settings hint ----------------------------------------------------- */
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint {
-  background: var(--q-raised) !important;
-  border-color: var(--q-border) !important;
-  box-shadow: var(--q-pop-shadow) !important;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-arrow {
-  background: var(--q-raised) !important;
-  border-left-color: var(--q-border) !important;
-  border-top-color: var(--q-border) !important;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-title {
-  color: var(--q-text-1) !important;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-text {
-  color: var(--q-text-2) !important;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-dismiss {
-  background: var(--q-accent) !important;
-}
-
-.yt-timestamps-container.yt-skin-quiet .yt-settings-hint-dismiss:hover {
-  background: var(--q-accent-hover) !important;
-}
-
 /* --- Scrollbar polish -------------------------------------------------------------- */
 
 .yt-timestamps-container.yt-skin-quiet .yt-accordion-body::-webkit-scrollbar {

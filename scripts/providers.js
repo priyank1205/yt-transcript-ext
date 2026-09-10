@@ -70,26 +70,6 @@ export const PROVIDERS = {
       'Click "Create Key"',
       'Copy the key and paste it here'
     ]
-  },
-  mistral: {
-    id: 'mistral',
-    name: 'Mistral AI',
-    description: 'Fast & efficient transcripts',
-    clientClass: OpenAICompatibleClient,
-    storageKey: 'MISTRAL_API_KEY',
-    endpoint: 'https://api.mistral.ai/v1/chat/completions',
-    defaultModel: 'mistral-large-latest',
-    svgIcon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z"/></svg>`,
-    cssClass: 'mistral',
-    helpTitle: 'How to get your Mistral API key',
-    helpSteps: [
-      'Open the <strong>Mistral Console</strong> and sign up or log in.',
-      'Open <strong>API Keys</strong> in the sidebar.',
-      'Click <strong>Create new key</strong> and copy it. You may need to verify a phone number and activate the free "Experiment" plan first.',
-      'Paste it in the field above and click <strong>Save</strong>.'
-    ],
-    helpNote: 'Mistral\'s free Experiment tier works here (phone verification required).',
-    helpLink: 'https://console.mistral.ai/api-keys/'
   }
 };
 
@@ -104,11 +84,89 @@ export const RETIRED_MODEL_PATTERNS = {
   anthropic: [/^claude-instant/i, /^claude-2/i, /^claude-3-(haiku|sonnet|opus)/i, /^claude-3-5-(haiku|sonnet)/i]
 };
 
+// Providers that used to be built in, and the settings they leave behind.
+//
+// Dropping an entry from PROVIDERS above does not drop what it wrote: the key
+// and the `<id>_MODEL` stay in storage, where nothing can read them and no
+// settings card exists to delete them — an API key outliving the code that
+// could use it. Worse, a `SELECTED_MODEL` still naming the provider no longer
+// resolves, so every generation fails with "Unknown provider" until the user
+// happens to open settings. Listing the id here lets the background clear both
+// once, on update. Entries stay for a few releases, then go.
+export const REMOVED_PROVIDERS = [
+  { id: 'mistral', storageKey: 'MISTRAL_API_KEY' }
+];
+
 // Does a saved model id name something the provider has since retired?
 export function isRetiredModel(providerId, modelId) {
   const patterns = RETIRED_MODEL_PATTERNS[providerId];
   if (!patterns || !modelId) return false;
   return patterns.some((pattern) => pattern.test(modelId));
+}
+
+// How a model is named to a person. The registry's friendly name is used when
+// the saved model is still the provider's default, and the raw id otherwise —
+// a substituted model has no friendly name and pretending otherwise would
+// misreport what is actually configured.
+//
+// It also drops a leading word the provider name already carries, because
+// "Google Gemini · Gemini Flash-Lite Latest" says Gemini twice.
+export function modelLabel(provider, modelId) {
+  if (!provider) return String(modelId || '');
+  const id = modelId || provider.defaultModel || '';
+  let label = (id && id === provider.defaultModel && provider.defaultModelName) || id;
+  const firstWord = String(label).split(' ')[0];
+  if (String(label).includes(' ') && String(provider.name || '').toLowerCase().includes(firstWord.toLowerCase())) {
+    label = String(label).slice(firstWord.length).trim();
+  }
+  return label;
+}
+
+// Is this provider usable with what is in storage? A custom endpoint pointing at
+// a local model is deliberately saved with an empty key, so for those the test
+// is whether the storage key is present at all — not whether it is truthy.
+export function hasCredential(provider, stored) {
+  const key = (stored || {})[provider.storageKey];
+  return !!key || (provider.isCustom && key === '');
+}
+
+// Every provider the stored settings can actually use — built-ins first, then
+// saved custom endpoints. An empty result is what "not set up yet" means, and
+// it is the only question the panel, the popup and the toolbar badge ask.
+export function configuredProviders(stored) {
+  const saved = Array.isArray(stored?.CUSTOM_PROVIDERS) ? stored.CUSTOM_PROVIDERS : [];
+  const custom = saved.map((cp) => ({ ...cp, isCustom: true }));
+  return [...Object.values(PROVIDERS), ...custom].filter((p) => hasCredential(p, stored));
+}
+
+// --- Key shapes --------------------------------------------------------------
+//
+// A pasted key already says which provider it belongs to. That is what lets
+// first-run setup ask for one key instead of opening on a grid of providers
+// the user has no basis to choose between.
+//
+// Order matters: `sk-ant-` has to be tested before the looser `sk-` that OpenAI
+// and most OpenAI-compatible endpoints share. Only keys with a distinctive
+// prefix belong here — a bare alphanumeric key of a given length matches far too
+// much to be evidence of anything, and a wrong guess sends someone's key to the
+// wrong company. Providers without a recognisable shape are reached through the
+// provider list instead.
+//
+// A match is a hint, never a verdict — the key is still validated against the
+// provider before anything is saved.
+export const KEY_SHAPES = [
+  { providerId: 'gemini', test: /^AIza[A-Za-z0-9_-]{30,}$/ },
+  { providerId: 'anthropic', test: /^sk-ant-[A-Za-z0-9_-]{20,}$/ },
+  { providerId: 'openai', test: /^sk-(?:proj-)?[A-Za-z0-9_-]{20,}$/ }
+];
+
+// Which provider does this look like? Returns a provider id, or null when the
+// shape matches nothing known — in which case setup asks instead of guessing.
+export function detectKeyProvider(value) {
+  const key = String(value ?? '').trim();
+  if (!key) return null;
+  const hit = KEY_SHAPES.find((shape) => shape.test.test(key));
+  return hit ? hit.providerId : null;
 }
 
 // --- Custom endpoints --------------------------------------------------------

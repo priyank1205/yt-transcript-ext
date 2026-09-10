@@ -9,6 +9,53 @@ section under the new version number when you release.
 
 ## Unreleased
 
+### Added
+
+- A guided first-run setup, opened automatically on install. It asks one
+  question — where the writing should come from — and takes a single pasted
+  key. You no longer have to say which provider the key belongs to: its shape
+  identifies it, and setup checks it with that provider before saving anything.
+  A key whose shape matches nothing known is offered the provider list instead
+  of being guessed at.
+- A toolbar popup. Before a key exists it is one **Add API key** button; after,
+  a small status card naming the provider and model a summary would actually
+  use. It never displays a key.
+- A badge on the toolbar icon while no provider is configured — one honest
+  signal that the extension cannot do anything yet, rather than a count.
+
+### Changed
+
+- Keys are validated by asking the provider for its model listing instead of by
+  sending a real completion. Validation is now free, returns promptly, and no
+  longer reports a good key as rejected merely because its tier cannot reach
+  the provider's default model — in that case setup saves a model the key *can*
+  reach and says which.
+- The panel's primary button reads **Add API key** and opens the setup flow.
+  The first-run tooltip that used to point at the settings gear is gone: the
+  button now says outright what the gear had to explain.
+
+### Removed
+
+- Mistral is no longer a built-in provider. The built-ins are Gemini, OpenAI and
+  Anthropic; every other service — Mistral included — is reached the same way,
+  through **Add a custom provider** with the endpoint URL and your own key. For
+  Mistral that is `https://api.mistral.ai/v1/chat/completions`.
+- The standing host permission for `api.mistral.ai`. A custom provider asks
+  Chrome for access to its own host when you save it, and hands it back when you
+  delete it, so nothing needs a permanent grant.
+
+### Fixed
+
+- Updating cleans up after the removed provider instead of leaving it in your
+  settings: a saved Mistral key and its model are dropped from local storage —
+  nothing could read them any more, and no settings card was left to delete
+  them — and a provider selection still naming Mistral falls back to **Auto**.
+  Without that last part every summary would have failed with *Unknown
+  provider* until you happened to reopen settings.
+
+If Mistral was your only configured provider you will be asked for a key again;
+re-adding it as a custom provider is the way back.
+
 ## 1.3.0 — 2026-09-09
 
 ### Added

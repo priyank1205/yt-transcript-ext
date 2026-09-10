@@ -42,6 +42,7 @@ function manifestFileRefs(m) {
     add('options_ui.page', m.options_ui?.page);
 
     for (const [size, path] of Object.entries(m.icons || {})) add(`icons.${size}`, path);
+    add('action.default_popup', m.action?.default_popup);
     for (const [size, path] of Object.entries(m.action?.default_icon || {})) {
         add(`action.default_icon.${size}`, path);
     }

@@ -64,7 +64,7 @@ jobs:
           4. Open a YouTube video — the **Timestamped Summary** panel appears in the sidebar.
 
           Then open the extension's settings and paste an API key for one provider
-          (Gemini, OpenAI, Anthropic, Mistral, or your own endpoint).
+          (Gemini, OpenAI, Anthropic, or your own OpenAI-compatible endpoint).
 
           ### Updating from an earlier version
 

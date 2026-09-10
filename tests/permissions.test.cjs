@@ -18,13 +18,19 @@ const storageListeners = [];
 const sentToTabs = [];
 let openTabs = [];
 let accessLevel = null;
+let badgeText = null;
 
 globalThis.chrome = {
   runtime: {
     onInstalled: { addListener: noop },
+    onStartup: { addListener: noop },
     onMessage: { addListener: (fn) => messageListeners.push(fn) },
     getURL: (p) => p,
     lastError: null
+  },
+  action: {
+    setBadgeText: async ({ text }) => { badgeText = text; },
+    setBadgeBackgroundColor: async () => {}
   },
   storage: {
     local: {
@@ -55,6 +61,7 @@ const reset = () => {
   for (const key of Object.keys(state)) delete state[key];
   sentToTabs.length = 0;
   openTabs = [];
+  badgeText = null;
 };
 
 // A message as Chrome delivers it from the panel: top frame of a YouTube tab.
@@ -83,18 +90,19 @@ test('the panel is told what it renders and nothing else', async () => {
   Object.assign(state, {
     GEMINI_API_KEY: 'secret-gemini', ANTHROPIC_API_KEY: 'secret-anthropic',
     SUMMARY_LENGTH: 'brief', THEME_PREF: 'dark', PANEL_SKIN: 'classic',
-    SHOW_SETTINGS_HINT: true, SELECTED_MODEL: 'anthropic'
+    SELECTED_MODEL: 'anthropic'
   });
 
   const prefs = await send({ action: 'GET_PANEL_PREFS' });
 
   assert.deepEqual(Object.keys(prefs).sort(),
-    ['providerReady', 'showSettingsHint', 'skin', 'summaryLength', 'theme']);
+    ['providerReady', 'skin', 'summaryLength', 'theme']);
   assert.deepEqual(prefs, {
-    summaryLength: 'brief', theme: 'dark', skin: 'classic',
-    showSettingsHint: true, providerReady: true
+    summaryLength: 'brief', theme: 'dark', skin: 'classic', providerReady: true
   });
-  // Belt and braces: no value anywhere in the payload is a stored secret.
+  // Which provider is configured is not the panel's business, and neither is
+  // any key: no value anywhere in the payload is a stored secret.
+  assert.ok(!JSON.stringify(prefs).includes('anthropic'));
   assert.ok(!JSON.stringify(prefs).includes('secret'));
 });
 
@@ -126,14 +134,12 @@ test('a page that is not the panel gets no answer', async () => {
   }
 });
 
-test('the panel may write two preferences, by name and by value', async () => {
+test('the panel may write one preference, by name and by value', async () => {
   reset();
 
   await send({ action: 'SET_PANEL_PREF', name: 'summaryLength', value: 'detailed' });
-  await send({ action: 'SET_PANEL_PREF', name: 'showSettingsHint', value: false });
   await flush();
   assert.equal(state.SUMMARY_LENGTH, 'detailed');
-  assert.equal(state.SHOW_SETTINGS_HINT, false);
 
   // Not writable: another key entirely, a raw storage key, an unsupported value.
   await send({ action: 'SET_PANEL_PREF', name: 'GEMINI_API_KEY', value: 'injected' });
@@ -204,4 +210,43 @@ test('a custom endpoint is normalized to https and scoped to its own origin', as
   assert.equal(endpointOrigin({ isCustom: true, endpoint: 'https://api.example.com/v1/x' }),
     'https://api.example.com/*');
   assert.equal(endpointOrigin({ isCustom: true, endpoint: 'not a url' }), null);
+});
+
+test('the toolbar badge marks an extension that cannot work yet', async () => {
+  reset();
+  await load('../background/service-worker.js');
+  const change = () => storageListeners[0]({ GEMINI_API_KEY: {} }, 'local');
+
+  // Nothing configured: the badge is the one honest signal that this extension
+  // cannot do anything at all yet.
+  change();
+  await flush();
+  assert.equal(badgeText, '!');
+
+  state.GEMINI_API_KEY = 'secret-gemini';
+  change();
+  await flush();
+  assert.equal(badgeText, '');
+
+  // Removing the key puts it back: readiness is derived, never remembered.
+  delete state.GEMINI_API_KEY;
+  change();
+  await flush();
+  assert.equal(badgeText, '!');
+});
+
+test('a keyless local custom provider clears the badge too', async () => {
+  reset();
+  await load('../background/service-worker.js');
+  Object.assign(state, {
+    CUSTOM_PROVIDERS: [{
+      id: 'custom_1', name: 'Local', isCustom: true,
+      storageKey: 'CUSTOM_CUSTOM_1_API_KEY',
+      endpoint: 'http://localhost:1234/v1/chat/completions'
+    }],
+    CUSTOM_CUSTOM_1_API_KEY: ''
+  });
+  storageListeners[0]({ CUSTOM_PROVIDERS: {} }, 'local');
+  await flush();
+  assert.equal(badgeText, '');
 });

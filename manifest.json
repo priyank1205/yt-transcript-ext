@@ -11,8 +11,7 @@
     "*://*.youtube.com/*",
     "https://generativelanguage.googleapis.com/*",
     "https://api.openai.com/*",
-    "https://api.anthropic.com/*",
-    "https://api.mistral.ai/*"
+    "https://api.anthropic.com/*"
   ],
   "optional_host_permissions": [
     "https://*/*",
@@ -34,6 +33,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
+    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

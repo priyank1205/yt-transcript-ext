@@ -1,6 +1,6 @@
 // background/service-worker.js
 
-import { PROVIDERS, isRetiredModel, endpointOrigin } from '../scripts/providers.js';
+import { PROVIDERS, REMOVED_PROVIDERS, isRetiredModel, endpointOrigin, hasCredential } from '../scripts/providers.js';
 import { OpenAICompatibleClient } from '../scripts/openai-compatible-client.js';
 import { getPlayerCaptions } from '../scripts/caption-reader.js';
 import { apiError, classifyError, ERROR_CODES } from '../scripts/errors.js';
@@ -26,17 +26,36 @@ try {
   console.warn('Storage access level unavailable:', err?.message);
 }
 
-// First-run onboarding: on fresh install, open the settings page and flag the
-// in-page tooltip that points new users to the settings gear icon. Every
-// install or update also re-checks the saved model ids, since a provider can
-// retire the model a working key was configured with.
+// First-run: open the setup flow. There is exactly one thing to configure — an
+// API key — so there is no checklist and no progress to track. Everything that
+// asks "is this set up?" answers it the same way the panel already did, by
+// asking whether any provider is configured.
+//
+// The old gear tooltip goes with it: it existed to explain where keys live,
+// which the panel's own button now says outright.
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.storage.local.set({ SHOW_SETTINGS_HINT: true });
-    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#setup') });
   }
   migrateRetiredModels();
+  dropRemovedProviders();
+  refreshActionBadge();
 });
+
+// One honest signal on the toolbar icon: this extension cannot do anything yet.
+// It is not a count, because there is nothing to count down.
+async function refreshActionBadge() {
+  try {
+    const { providerReady } = await panelPrefs();
+    await chrome.action.setBadgeText({ text: providerReady ? '' : '!' });
+    if (!providerReady) await chrome.action.setBadgeBackgroundColor({ color: '#cc0000' });
+  } catch (err) {
+    console.warn('Could not update the toolbar badge:', err?.message);
+  }
+}
+
+chrome.runtime.onStartup.addListener(refreshActionBadge);
+refreshActionBadge();
 
 // Rewrite `<provider>_MODEL` values naming a model the provider has retired.
 // Without this a key that still works sits beside a model that no longer does,
@@ -58,6 +77,40 @@ async function migrateRetiredModels() {
     if (Object.keys(updates).length) await chrome.storage.local.set(updates);
   } catch (err) {
     console.warn('Model migration failed:', err.message);
+  }
+}
+
+// Clear what a provider left behind when it stopped being built in.
+//
+// Two separate problems, and the second is the one users feel. Its key and
+// `<id>_MODEL` are unreachable once the registry entry is gone — no card
+// renders them, so nothing can delete them — and a key has no business
+// outliving the code that could use it. And a `SELECTED_MODEL` still naming the
+// provider fails every generation with "Unknown provider", because the id no
+// longer resolves; the settings page repairs that, but only if the user thinks
+// to open it. Auto is the default and falls back across whatever is still
+// configured, so that is where an orphaned selection lands.
+//
+// Removing the key fires the storage.onChanged listener above, which is what
+// re-reads the toolbar badge if this cleared the last configured provider.
+async function dropRemovedProviders() {
+  try {
+    const orphans = REMOVED_PROVIDERS.flatMap((p) => [p.storageKey, `${p.id}_MODEL`]);
+    const stored = await chrome.storage.local.get([...orphans, 'SELECTED_MODEL']);
+
+    const present = orphans.filter((key) => key in stored);
+    if (present.length) {
+      await chrome.storage.local.remove(present);
+      console.log(`Cleared settings left by removed providers: ${present.join(', ')}`);
+    }
+
+    const selected = stored.SELECTED_MODEL;
+    if (REMOVED_PROVIDERS.some((p) => p.id === selected)) {
+      await chrome.storage.local.set({ SELECTED_MODEL: 'auto' });
+      console.log(`Provider "${selected}" is no longer built in; selection reset to auto.`);
+    }
+  } catch (err) {
+    console.warn('Removed-provider cleanup failed:', err.message);
   }
 }
 
@@ -282,6 +335,7 @@ function recordSummaryStat(summary, durationMinutes) {
       SECONDS_SAVED: (res.SECONDS_SAVED || 0) + savedSeconds,
     });
   });
+
 }
 
 function getClient(modelName, allProviders) {
@@ -293,11 +347,6 @@ function getClient(modelName, allProviders) {
 // Is this provider set up well enough to be tried? A local custom endpoint is
 // legitimately keyless: an empty string means "configured, no key needed",
 // which is a different answer from never configured at all.
-function hasCredential(provider, storage) {
-  const key = storage[provider.storageKey];
-  return !!key || (provider.isCustom && key === '');
-}
-
 function configuredProviderIds(allProviders, storage) {
   return Object.keys(allProviders).filter((id) => hasCredential(allProviders[id], storage));
 }
@@ -341,27 +390,23 @@ const WRITABLE_PANEL_PREFS = {
   summaryLength: {
     storageKey: 'SUMMARY_LENGTH',
     accepts: (value) => ['brief', 'standard', 'detailed'].includes(value)
-  },
-  showSettingsHint: {
-    storageKey: 'SHOW_SETTINGS_HINT',
-    accepts: (value) => typeof value === 'boolean'
   }
 };
 
 async function panelPrefs() {
   const allProviders = await loadProviders();
   const storage = await chrome.storage.local.get([
-    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN', 'SHOW_SETTINGS_HINT',
+    'SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN',
     ...Object.values(allProviders).map((p) => p.storageKey)
   ]);
+  const providerReady = configuredProviderIds(allProviders, storage).length > 0;
   return {
     summaryLength: storage.SUMMARY_LENGTH || 'standard',
     theme: storage.THEME_PREF || 'system',
     skin: storage.PANEL_SKIN || 'quiet',
-    showSettingsHint: !!storage.SHOW_SETTINGS_HINT,
     // Whether generation is possible at all — the panel uses it to choose
-    // between "Generate summary" and "Set API keys".
-    providerReady: configuredProviderIds(allProviders, storage).length > 0
+    // between "Generate summary" and "Add API key".
+    providerReady
   };
 }
 
@@ -399,7 +444,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const relevant = Object.keys(changes).some((key) =>
     key.endsWith('_API_KEY') || key === 'CUSTOM_PROVIDERS' ||
     ['SUMMARY_LENGTH', 'THEME_PREF', 'PANEL_SKIN'].includes(key));
-  if (relevant) broadcastPanelPrefs();
+  if (relevant) {
+    broadcastPanelPrefs();
+    refreshActionBadge();
+  }
 });
 
 // Is this message from the YouTube page itself, in its top frame? Origin and
@@ -450,8 +498,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "OPEN_OPTIONS") {
-    const optionsUrl = chrome.runtime.getURL('options/options.html');
-    chrome.tabs.create({ url: optionsUrl });
+    // The panel asks for the setup flow by name while its button reads "Set up",
+    // so someone who has never configured anything lands on the three-screen
+    // flow rather than the full settings page.
+    const view = request.view === 'setup' ? '#setup' : '';
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') + view });
     return;
   }
   if (request.action === "KEYS_CHANGED") {

@@ -46,7 +46,10 @@
   // non-secret preferences it renders (GET_PANEL_PREFS), so the harness answers
   // that message instead of stubbing a storage area.
   window.__prefs = { skin: 'quiet', theme: 'system', summaryLength: 'standard',
-    showSettingsHint: false, providerReady: true };
+    providerReady: true,
+    // Set providerReady false to see the panel's "Add API key" state,
+    // then press Reset panel.
+  };
 
   const SAMPLE_SUMMARY = [
     // The overview line the validator emits above the sections (backlog #9).

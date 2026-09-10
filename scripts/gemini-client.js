@@ -72,6 +72,12 @@ Here is the transcript: ${transcript}`;
   // model that has been retired since it was saved never reads as a bad key.
   async validateKey(apiKey, modelId) {
     const model = modelId || this.providerConfig?.defaultModel || 'gemini-flash-lite-latest';
+    // A listing answers this faster, for free, and without mistaking a model
+    // the key's tier cannot reach for a key that does not work. Falls through
+    // to the probe below only when no list could be read.
+    const listed = await this.validateByListing(apiKey, model);
+    if (listed) return listed;
+
     try {
       const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const res = await fetch(`${API_ENDPOINT}?key=${apiKey}`, {

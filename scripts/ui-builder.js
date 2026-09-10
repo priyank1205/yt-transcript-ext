@@ -53,7 +53,6 @@ const PANEL_PREF_DEFAULTS = {
     summaryLength: 'standard',
     theme: 'system',
     skin: 'quiet',
-    showSettingsHint: false,
     providerReady: false
 };
 let _panelPrefs = { ...PANEL_PREF_DEFAULTS };
@@ -96,6 +95,7 @@ function applyPanelPrefs(prefs) {
     _panelPrefs = { ...PANEL_PREF_DEFAULTS, ...prefs };
     if (_panelPrefs.theme !== previous.theme) setPanelThemePref(_panelPrefs.theme);
     if (_panelPrefs.skin !== previous.skin) setPanelSkinPref(_panelPrefs.skin);
+    // Saving a key in the other tab flips this panel on its own.
     if (_panelPrefs.providerReady !== previous.providerReady) refreshGenerateButtonMode();
 }
 
@@ -1241,7 +1241,7 @@ function renderEmptyState(container) {
     genBtn.textContent = 'Generate summary';
     genBtn.className = 'yt-timestamps-generate-button';
     // Wire the button based on whether an API key is configured
-    // ('Generate summary' vs 'Set API keys' -> opens settings)
+    // ('Generate summary' vs 'Add API key' -> opens the setup flow)
     setGenerateButtonMode(genBtn);
 
     // Append elements to action area
@@ -1276,8 +1276,6 @@ function renderEmptyState(container) {
             renderEmptyState(container);
             return;
         }
-        // First-run onboarding: point new users to the settings gear icon.
-        if (prefs.showSettingsHint) showSettingsHint(panel, gearIcon);
     });
 }
 
@@ -1341,61 +1339,6 @@ function mountSidebar(secondary) {
     if (cachedSummary) {
         renderTimestampsUI(cachedSummary.text, cachedSummary.meta);
     }
-}
-
-// Function to show a first-run tooltip pointing at the settings gear icon
-function showSettingsHint(panel, gearIcon) {
-    if (!panel || !gearIcon) return;
-    // Anchor to the container (not the panel) — the panel clips with overflow:hidden
-    const host = panel.parentElement || panel;
-    if (host.querySelector('.yt-settings-hint')) return; // avoid duplicates
-
-    // Draw the eye to the gear
-    gearIcon.classList.add('yt-gear-pulse');
-
-    const hint = document.createElement('div');
-    hint.className = 'yt-settings-hint';
-
-    const arrow = document.createElement('div');
-    arrow.className = 'yt-settings-hint-arrow';
-
-    const title = document.createElement('div');
-    title.className = 'yt-settings-hint-title';
-    title.textContent = 'Manage your API keys here';
-
-    const text = document.createElement('div');
-    text.className = 'yt-settings-hint-text';
-    text.textContent = 'Open Settings from this icon anytime to add or update your LLM API keys.';
-
-    const dismiss = document.createElement('button');
-    dismiss.className = 'yt-settings-hint-dismiss';
-    dismiss.textContent = 'Got it';
-
-    hint.appendChild(arrow);
-    hint.appendChild(title);
-    hint.appendChild(text);
-    hint.appendChild(dismiss);
-
-    // Anchor just below the header, under the gear
-    const header = panel.querySelector('.yt-timestamps-panel-header');
-    if (header) hint.style.top = `${header.offsetHeight + 6}px`;
-
-    const close = () => {
-        hint.remove();
-        gearIcon.classList.remove('yt-gear-pulse');
-        gearIcon.removeEventListener('click', close);
-        writePanelPref('showSettingsHint', false);
-    };
-
-    dismiss.addEventListener('click', (e) => {
-        e.stopPropagation();
-        close();
-    });
-
-    // Also dismiss once the user opens settings via the gear
-    gearIcon.addEventListener('click', close, { once: true });
-
-    host.appendChild(hint);
 }
 
 // --- Request ownership -------------------------------------------------------
@@ -1561,10 +1504,19 @@ function setGenerateButtonMode(genBtn) {
                 ? 'An overview, then chapters linked to the video'
                 : 'Generate an AI-powered summary with timestamps';
         } else {
-            genBtn.textContent = 'Set API keys';
+            // There is exactly one thing to configure, so the panel says what it
+            // is rather than counting steps. The line above names the API key —
+            // the thing the user will have to go and get — and the button is the
+            // action that starts it.
+            genBtn.textContent = 'Add API key';
             genBtn.classList.add('yt-needs-keys');
-            genBtn.onclick = () => { chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" }); };
-            if (emptyText) emptyText.textContent = 'Add an LLM API key to start generating summaries';
+            genBtn.onclick = () => {
+                chrome.runtime.sendMessage({ action: "OPEN_OPTIONS", view: "setup" });
+            };
+            if (emptyText) {
+                emptyText.textContent =
+                    'Summaries need an API key. Google gives one away free — about two minutes to set up.';
+            }
         }
     });
 }
